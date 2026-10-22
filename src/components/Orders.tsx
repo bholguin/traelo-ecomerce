@@ -3,11 +3,10 @@
 import { useLiveQuery } from "dexie-react-hooks";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { findDepartamento } from "@/lib/colombia";
 import { db } from "@/lib/db";
 import { formatCOP, formatDate } from "@/lib/format";
 import { retryOrder } from "@/lib/sync";
-import type { OrderStatus } from "@/lib/types";
+import type { OrderStatus, QueuedOrder } from "@/lib/types";
 
 const STATUS: Record<OrderStatus, { label: string; tone: string }> = {
   pendiente: { label: "Guardado, esperando señal", tone: "bg-warn/25 text-ink" },
@@ -16,6 +15,25 @@ const STATUS: Record<OrderStatus, { label: string; tone: string }> = {
   enviado: { label: "Recibido", tone: "bg-ok/15 text-ok" },
   revision: { label: "Requiere revisión", tone: "bg-bad/10 text-bad" },
 };
+
+// Estado en WooCommerce, una vez que el pedido llegó. Los estados que agregue
+// un plugin (por ejemplo Dropify) y no estén aquí se muestran como "En proceso".
+const REMOTE_STATUS: Record<string, { label: string; tone: string }> = {
+  pending: { label: "Recibido", tone: "bg-ok/15 text-ok" },
+  processing: { label: "En preparación", tone: "bg-ok/15 text-ok" },
+  "on-hold": { label: "En espera", tone: "bg-warn/25 text-ink" },
+  completed: { label: "Entregado", tone: "bg-ok/15 text-ok" },
+  cancelled: { label: "Cancelado", tone: "bg-bad/10 text-bad" },
+  refunded: { label: "Reembolsado", tone: "bg-bad/10 text-bad" },
+  failed: { label: "Fallido", tone: "bg-bad/10 text-bad" },
+  trash: { label: "Cancelado", tone: "bg-bad/10 text-bad" },
+};
+const REMOTE_FALLBACK = { label: "En proceso", tone: "bg-ok/15 text-ok" };
+
+function statusBadge(o: QueuedOrder) {
+  if (o.status !== "enviado" || !o.remoteStatus) return STATUS[o.status];
+  return REMOTE_STATUS[o.remoteStatus] ?? REMOTE_FALLBACK;
+}
 
 export function Orders() {
   const nuevo = useSearchParams().get("nuevo");
@@ -43,7 +61,7 @@ export function Orders() {
       ) : (
         <ul className="mt-5 space-y-3">
           {orders.map((o) => {
-            const s = STATUS[o.status];
+            const s = statusBadge(o);
             return (
               <li
                 key={o.clientOrderId}
@@ -63,7 +81,7 @@ export function Orders() {
                 </p>
                 <div className="mt-2 flex items-center justify-between">
                   <span className="text-sm text-muted">
-                    {o.customer.city}, {findDepartamento(o.customer.department)?.name ?? o.customer.department}
+                    {o.customer.city}, {o.customer.department}
                   </span>
                   <span className="font-bold">{formatCOP(o.total)}</span>
                 </div>

@@ -35,8 +35,8 @@ export function Catalog() {
     <div>
       {meta?.demo && (
         <p className="mb-4 rounded-xl border border-warn/60 bg-warn/15 px-4 py-2.5 text-sm">
-          Modo demo: catálogo de prueba. Configura <code>DROPI_TOKEN</code> y tus productos en{" "}
-          <code>src/config/productos.ts</code> para vender desde Dropi.
+          Modo demo: catálogo de prueba. Configura <code>WC_URL</code>, <code>WC_KEY</code> y{" "}
+          <code>WC_SECRET</code> para cargar tus productos de Dropi.
         </p>
       )}
 

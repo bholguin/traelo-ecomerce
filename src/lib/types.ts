@@ -32,7 +32,7 @@ export type Customer = {
 export type OrderStatus =
   | "pendiente" // guardado en el dispositivo, sin enviar
   | "enviando"
-  | "enviado" // creado en Dropi
+  | "enviado" // creado en WooCommerce
   | "revision" // error de negocio: requiere revisión
   | "error"; // error de red, se reintenta
 
@@ -46,8 +46,17 @@ export type QueuedOrder = {
   attempts: number;
   nextAttemptAt: number;
   remoteId?: number;
+  remoteStatus?: string; // estado en WooCommerce ("processing", "completed"…), solo si status = "enviado"
+  remoteCheckedAt?: number;
   message?: string;
 };
+
+// Estados de WooCommerce que ya no cambian: no se vuelven a consultar.
+export const FINAL_REMOTE_STATUSES = ["completed", "cancelled", "refunded", "failed", "trash"];
+
+export type OrderStatusResponse =
+  | { ok: true; statuses: Record<number, string>; demo?: boolean }
+  | { ok: false; message: string };
 
 export type OrderPayload = {
   clientOrderId: string;

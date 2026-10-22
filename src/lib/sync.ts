@@ -1,7 +1,15 @@
 "use client";
 
 import { db } from "./db";
-import type { Customer, OrderPayload, OrderResponse, Product, QueuedOrder } from "./types";
+import {
+  FINAL_REMOTE_STATUSES,
+  type Customer,
+  type OrderPayload,
+  type OrderResponse,
+  type OrderStatusResponse,
+  type Product,
+  type QueuedOrder,
+} from "./types";
 
 const MAX_BACKOFF_MS = 15 * 60 * 1000;
 
@@ -92,7 +100,7 @@ async function sendOrder(order: QueuedOrder) {
         status: "enviado",
         remoteId: data.orderId,
         total: data.total,
-        message: data.demo ? "Modo demo: no se creó en Dropi" : undefined,
+        message: data.demo ? "Modo demo: no se creó en WooCommerce" : undefined,
       });
       return;
     }
@@ -113,6 +121,46 @@ async function sendOrder(order: QueuedOrder) {
       nextAttemptAt: Date.now() + backoff,
       message: e instanceof Error ? e.message : "Error de red",
     });
+  }
+}
+
+// ---------- Estado de pedidos enviados ----------
+
+let checkingStatuses = false;
+
+// Trae de WooCommerce el estado de los pedidos ya enviados que aún pueden cambiar.
+export async function refreshOrderStatuses() {
+  if (checkingStatuses) return;
+  if (typeof navigator !== "undefined" && !navigator.onLine) return;
+  checkingStatuses = true;
+  try {
+    const active = await db.orders
+      .where("status")
+      .equals("enviado")
+      .filter((o) => Boolean(o.remoteId) && !FINAL_REMOTE_STATUSES.includes(o.remoteStatus ?? ""))
+      .limit(100)
+      .toArray();
+    if (active.length === 0) return;
+
+    const res = await fetch("/api/pedidos/estado", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orders: active.map((o) => ({ id: o.remoteId, clientOrderId: o.clientOrderId })) }),
+    });
+    const data = (await res.json().catch(() => null)) as OrderStatusResponse | null;
+    if (!res.ok || !data?.ok) return;
+
+    const checkedAt = Date.now();
+    await db.transaction("rw", db.orders, async () => {
+      for (const o of active) {
+        const remoteStatus = data.statuses[o.remoteId!];
+        if (remoteStatus) await db.orders.update(o.clientOrderId, { remoteStatus, remoteCheckedAt: checkedAt });
+      }
+    });
+  } catch {
+    // Sin red o servidor caído: se reintenta en el próximo ciclo.
+  } finally {
+    checkingStatuses = false;
   }
 }
 

@@ -2,17 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
-import { DEPARTAMENTOS, findDepartamento } from "@/lib/colombia";
+import { DEPARTAMENTOS } from "@/lib/colombia";
 import { formatCOP } from "@/lib/format";
 import { useCart, useOnline } from "@/lib/hooks";
 import { enqueueOrder } from "@/lib/sync";
 import type { Customer } from "@/lib/types";
-
-// Nombres más claros para el cliente; el valor enviado sigue siendo el código de Dropi.
-const LABEL: Record<string, string> = { VAC: "Valle del Cauca", CUN: "Cundinamarca (incluye Bogotá)" };
-const DEPTOS = [...DEPARTAMENTOS]
-  .map((d) => ({ code: d.code, label: LABEL[d.code] ?? d.name }))
-  .sort((a, b) => a.label.localeCompare(b.label, "es"));
 
 const field = "h-12 w-full rounded-xl border border-line bg-white px-4 outline-none focus:border-ink";
 
@@ -22,8 +16,6 @@ export default function CheckoutPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
-  const [depto, setDepto] = useState("");
-  const cities = findDepartamento(depto)?.cities ?? [];
 
   const empty = cart !== undefined && cart.length === 0 && !sending;
   useEffect(() => {
@@ -86,42 +78,15 @@ export default function CheckoutPage() {
           autoComplete="email"
           className={`${field} sm:col-span-2`}
         />
-        <select
-          name="department"
-          required
-          value={depto}
-          onChange={(e) => setDepto(e.target.value)}
-          className={field}
-          aria-label="Departamento"
-        >
+        <select name="department" required defaultValue="" className={field}>
           <option value="" disabled>
             Departamento
           </option>
-          {DEPTOS.map((d) => (
-            <option key={d.code} value={d.code}>
-              {d.label}
-            </option>
+          {DEPARTAMENTOS.map((d) => (
+            <option key={d}>{d}</option>
           ))}
         </select>
-        {/* Solo municipios que Dropi reconoce: un nombre escrito a mano puede dejar el pedido sin cobertura */}
-        <select
-          key={depto}
-          name="city"
-          required
-          defaultValue=""
-          disabled={!depto}
-          className={`${field} disabled:opacity-50`}
-          aria-label="Municipio"
-        >
-          <option value="" disabled>
-            {depto ? "Municipio" : "Elige primero el departamento"}
-          </option>
-          {cities.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
+        <input name="city" required placeholder="Ciudad o municipio" autoComplete="address-level2" className={field} />
         <input
           name="address"
           required

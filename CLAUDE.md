@@ -1,76 +1,62 @@
-# Contexto del proyecto: Tienda PWA offline + Dropi (100% Vercel)
+# Contexto del proyecto: Tienda PWA offline + WooCommerce + Dropi
 
 Lee también `AGENTS.md`: esta es Next.js 16.4 y sus APIs difieren de versiones anteriores. Antes de escribir código de Next, consulta `node_modules/next/dist/docs/`.
 
 ## Qué es
 
-Una PWA responsive para Colombia. Vende productos del catálogo de **Dropi** (dropshipping colombiano) con **pago contra entrega**. Su requisito central es **funcionar sin conexión**: el cliente navega el catálogo, arma el carrito y confirma el pedido sin señal, y el pedido se envía solo a Dropi cuando vuelve la red.
+Una PWA responsive para Colombia. Vende productos del catálogo de **Dropi** (dropshipping colombiano) con **pago contra entrega**. Su requisito central es **funcionar sin conexión**: el cliente navega el catálogo, arma el carrito y confirma el pedido sin señal, y el pedido se envía solo cuando vuelve la red.
 
 Idioma de la interfaz y de los textos: español de Colombia. Moneda: COP sin decimales.
 
 ## Arquitectura
 
 ```
-Celular (PWA Next.js) ──pedidos──▶ /api/pedidos  (Vercel) ──POST orders/myorders──▶ Dropi
-                      ◀─catálogo── /api/catalogo (Vercel) ◀─GET products/v2/{id}──┘
+Celular (PWA Next.js) ──pedidos──▶ /api/pedidos (Vercel) ──REST v3──▶ WooCommerce ──plugin Dropify──▶ Dropi
+                      ◀─catálogo── /api/catalogo (Vercel) ◀─Store API─┘
 ```
 
-Todo vive en **Vercel**: frontend, route handlers y (opcional) Upstash Redis. **No hay WordPress ni WooCommerce**; se descartaron porque Vercel no los puede alojar y el usuario quería un solo servicio.
+- **Frontend + API:** Next.js 16 (App Router, Turbopack, `cacheComponents: true`), desplegado en **Vercel**.
+- **Backend invisible:** WordPress + WooCommerce en modo headless, en un hosting PHP aparte. Sirve de catálogo y de panel de pedidos.
+- **Integración con Dropi:** el plugin oficial de WordPress `wc-dropi-integration` ("Dropify"). Importa los productos de Dropi a Woo y crea en Dropi cada pedido de Woo. Se configura con el access token que da Dropi en *Mis tiendas*. **No llamamos a Dropi directamente**: su API no tiene documentación pública.
 
 ## Decisiones tomadas (no cambiarlas sin preguntar)
 
 | Decisión | Motivo |
 | --- | --- |
 | PWA, no app nativa | Un solo código; se instala desde el navegador |
-| Next.js + Vercel, sin WooCommerce | Elección del usuario: todo en un solo hosting, todo en React |
-| Llamar directo a la API de integraciones de Dropi | Replicando el plugin oficial de WordPress, que es la única referencia de esa API |
-| Solo pago contra entrega (`rate_type: "CON RECAUDO"`) | Es el modelo nativo de Dropi |
+| Next.js + Vercel | Elección del usuario; los route handlers reemplazan a un mini-plugin de WordPress |
+| WooCommerce como intermediario con Dropi | La integración la resuelve el plugin oficial; evita depender de una API no documentada |
+| Solo pago contra entrega | Es el modelo nativo de Dropi; no hay pagos en línea en el MVP |
 | Sin cuentas de cliente ni login | Fuera del MVP |
-| Productos a vender en `src/config/productos.ts` (+ `DROPI_PRODUCT_IDS`) | Sin Woo no hay panel; el catálogo de Dropi es enorme y de todos los proveedores |
-| Token de Dropi solo en variables de entorno de Vercel | Nunca en el navegador ni con prefijo `NEXT_PUBLIC_` |
+| Llaves de Woo solo en variables de entorno de Vercel | Nunca en el navegador ni con prefijo `NEXT_PUBLIC_` |
 | Serwist para el service worker | Sucesor mantenido de next-pwa; se construye después de `next build` para precachear las rutas prerenderizadas |
-
-## La API de Dropi (lo más delicado del proyecto)
-
-Dropi **no publica documentación**. Todo `src/lib/dropi.ts` se sacó del código del plugin oficial `wc-dropi-integration` 4.7.3. Si algo falla con Dropi, compara primero contra ese plugin.
-
-- Base: `https://api.dropi.co/integrations/` (configurable con `DROPI_API_URL`).
-- Auth: header `dropi-integration-key: <DROPI_TOKEN>` en todas las llamadas.
-- Respuesta: `{ isSuccess: boolean, message?: string, status?: string, objects?: T }`.
-- `GET products/v2/{id}` devuelve el producto: `name`, `description` (HTML), `type` (`SIMPLE` | `VARIABLE`), `suggested_price`, `sale_price`, `stock`, `warehouse_product[].stock`, `photos[]` / `gallery[]` (`urlS3` → CloudFront `https://d39ru7awumhhs2.cloudfront.net/`, o `url` → `https://api.dropi.co/`), `categories[].name`, `user_id` (proveedor), `active`.
-- Stock = suma de `warehouse_product[].stock` si existe; si no, `stock`.
-- `POST orders/myorders`: el cuerpo replica `OrdersModel::save` del plugin, con `total_order`, `notes`, `name`, `surname`, `dir`, `country: "CO"`, `state` (**código** del departamento: `VAC`, `CUN`…), `city` (nombre exacto del municipio), `phone`, `client_email`, `payment_method_id: 1`, `status: "PENDIENTE CONFIRMACION"`, `type: "FINAL_ORDER"`, `rate_type: "CON RECAUDO"`, `calculate_costs_and_shiping: true`, `supplier_id` (`user_id` del primer producto), `shop_order_id`, `create_product_if_not_exist: false` y `products[]` (objeto completo del producto + `quantity`, `price` de venta unitario, `stock`, `token`). La respuesta trae `objects.id`, el ID del pedido en Dropi.
-- Diferencia con el plugin: `shop_order_id` lleva nuestro `clientOrderId` (UUID texto); el plugin envía el ID numérico del pedido de Woo. **No verificado contra la API real.**
-- Departamentos y municipios (`src/lib/colombia.ts`, 32 departamentos y 1.268 municipios) salen de las listas del plugin. No cambies los textos: Dropi los usa para la cobertura y el flete. Bogotá está como "Bogota" dentro de Cundinamarca (`CUN`). El checkout usa selectores cerrados para que el cliente no escriba un municipio que Dropi no reconozca.
 
 ## Stack
 
-- Next.js 16.4 (App Router, Turbopack, `cacheComponents: true`), React 19.3, TypeScript, Tailwind CSS v4 (tokens en `src/app/globals.css` con `@theme`)
+- Next.js 16.4, React 19.3, TypeScript, Tailwind CSS v4 (tokens en `src/app/globals.css` con `@theme`)
 - Serwist 9.5 en modo configurador: `serwist.config.mjs` y `serwist build` después de `next build`
 - Dexie 4 + dexie-react-hooks (IndexedDB)
-- Upstash Redis por su REST API con `fetch` (sin dependencia), opcional
 - Sin Google Fonts: se usa la pila de fuentes del sistema, que funciona offline
 
 ## Estructura
 
 ```
-src/config/productos.ts    qué productos de Dropi se venden y a qué precio
 src/app/
   page.tsx                 catálogo (búsqueda + categorías)
   producto/page.tsx        ficha: UNA ruta /producto?id=123 que lee de IndexedDB
   carrito/  checkout/  pedidos/  offline/
-  api/catalogo/route.ts    getCatalog() (use cache + cacheLife("minutes")); modo demo sin token
-  api/pedidos/route.ts     valida, comprueba que el producto esté configurado, recalcula con datos frescos de Dropi, deduplica y crea el pedido
-  sw.ts  manifest.ts
+  api/catalogo/route.ts    Store API de Woo → JSON; modo demo sin variables
+  api/pedidos/route.ts     valida, recalcula precio/stock, deduplica y crea el pedido en Woo
+  sw.ts                    service worker (Serwist)
+  manifest.ts              manifest PWA
 src/lib/
-  dropi.ts         cliente de Dropi (solo servidor, "server-only")
-  idempotency.ts   reserve / markDone / release por clientOrderId (Redis o memoria)
-  colombia.ts      DEPARTAMENTOS {code, name, cities[]}, findDepartamento()
-  db.ts            Dexie: products, cart, orders, meta
-  sync.ts          refreshCatalog(), enqueueOrder(), flushQueue(), retryOrder()
-  hooks.ts  types.ts  format.ts  demo-products.ts
-src/components/    Header, SyncManager, Pwa (SerwistProvider), Catalog, ProductDetail, Orders, ProductImage
-scripts/mock-dropi.mjs   Dropi simulado para probar sin token real
+  db.ts       Dexie: tablas products, cart, orders, meta
+  sync.ts     refreshCatalog(), enqueueOrder(), flushQueue(), retryOrder()
+  woo.ts      cliente WooCommerce, solo servidor ("server-only")
+  hooks.ts    useOnline, useCart, useCartCount, usePendingCount, useCatalogMeta
+  types.ts  format.ts  colombia.ts (33 departamentos)  demo-products.ts
+src/components/
+  Header, SyncManager, Pwa (SerwistProvider), Catalog, ProductDetail, Orders, ProductImage
 ```
 
 ## Reglas del modo offline (importantes)
@@ -85,36 +71,38 @@ scripts/mock-dropi.mjs   Dropi simulado para probar sin token real
 8. iOS no tiene Background Sync. `SyncManager` sincroniza al montar, en el evento `online`, al volver la pestaña visible y cada 30 s (cola) y cada 10 min (catálogo).
 9. El service worker está desactivado en `npm run dev`. Para probar el modo offline: `npm run build && npm start`.
 
-## Cola de pedidos y respuestas de `/api/pedidos`
+## Cola de pedidos
 
-| Respuesta | Cuándo | La PWA hace |
-| --- | --- | --- |
-| 200 `{ok:true, orderId}` | creado en Dropi (o `duplicated:true` si ya existía) | `enviado` |
-| 400 `{ok:false, kind:"validation"}` | datos inválidos, municipio fuera de la lista | `revision` |
-| 409 `{ok:false, kind:"business"}` | agotado, precio cambiado, producto no configurado, Dropi rechazó (`isSuccess:false`) | `revision` |
-| 503 | Dropi caído o sin respuesta, o el mismo pedido se está procesando | `error` → reintento con `2^intentos × 5 s`, máximo 15 min |
+Estados (`OrderStatus` en `types.ts`): `pendiente` → `enviando` → `enviado`.
+- Error de red o 5xx → `error`, con reintento automático y espera creciente (`2^intentos × 5 s`, máximo 15 min).
+- Error de negocio o validación (respuesta `{ok:false, kind:"business"|"validation"}`) → `revision`. No se reintenta solo; se muestra al cliente con un botón "Reintentar ahora".
+- Seguimiento: `refreshOrderStatuses()` pide a `POST /api/pedidos/estado` el estado en Woo de los pedidos `enviado` (cada 30 s con la pestaña visible, al abrir y al volver la red) y lo guarda en `remoteStatus`. Deja de consultar los estados finales (`FINAL_REMOTE_STATUSES`). El servidor solo responde si `remoteId` y `clientOrderId` coinciden.
+- Cada pedido tiene un `clientOrderId` (UUID). El servidor lo guarda en el meta `_pwa_client_order_id` y, si llega repetido, devuelve el pedido existente. Hoy busca entre los últimos 50 pedidos; con más volumen hará falta un índice propio.
 
-Idempotencia: `reserve(clientOrderId)` (SET NX, 10 min) → crear → `markDone` (30 días). Si algo falla, `release` para permitir el reintento. Sin Redis se usa memoria del proceso, que en Vercel no protege entre instancias.
+## API de pedidos: reglas del servidor
+
+- Nunca confiar en el precio del cliente. Se recalcula con la Store API. Si el precio cambió, el producto está agotado o falta stock, responde 409 `business`.
+- Celular colombiano: 10 dígitos que empiezan por 3.
+- El pedido se crea con `status: "processing"`, `payment_method: "cod"` y `set_paid: false`, con billing y shipping iguales (`state` = departamento, `country` = "CO").
 
 ## Variables de entorno
 
-`DROPI_TOKEN` (obligatoria en producción), `DROPI_PRODUCT_IDS` (opcional), `DROPI_API_URL` (opcional), `KV_REST_API_URL` y `KV_REST_API_TOKEN` (o `UPSTASH_REDIS_REST_*`, recomendadas). Ver `.env.example`. **Sin `DROPI_TOKEN`, la app corre en modo demo** con `DEMO_PRODUCTS`.
+`WC_URL` (sin barra final), `WC_KEY` y `WC_SECRET` (llave REST de Woo con lectura y escritura, de un usuario dedicado). Ver `.env.example`. **Sin ellas, la app corre en modo demo** con `DEMO_PRODUCTS`, y `/api/pedidos` responde `demo: true` sin crear nada.
 
 ## Estado actual
 
-- ✅ PWA y capa offline. Probado en Chromium a 390 px: catálogo offline, ficha offline, carrito, checkout offline con selectores de departamento y municipio, pedido en cola que se sincroniza al volver la red, sin errores de JavaScript.
-- ✅ Integración directa con Dropi, probada contra `scripts/mock-dropi.mjs`: catálogo (precio sugerido, stock por bodegas, fotos CloudFront, omite `VARIABLE` y los IDs inexistentes), pedido creado, reintento deduplicado, precio cambiado, stock insuficiente, producto no configurado, municipio inválido, Dropi caído (503) y reintento exitoso al volver.
-- ⏳ **Bloqueante antes de lanzar:** un pedido real con el token real. Revisar en el panel de Dropi que llegue con la dirección, el municipio, el valor a recaudar y el proveedor correctos. Confirmar que acepta `shop_order_id` como texto.
+- ✅ Fases 2 y 3: PWA base y capa offline. Probado en Chromium a 390 px: catálogo offline, ficha offline, carrito, checkout offline, pedido en cola que se sincroniza al volver la red, sin errores de JavaScript.
+- ✅ Route handlers de catálogo y pedidos, con modo demo.
+- ⏳ **Fase 0 (bloqueante antes de lanzar):** confirmar que el plugin de Dropi crea el pedido en Dropi cuando el pedido de Woo **llega por la REST API**. No está verificado; muchos plugins solo escuchan el checkout normal. El plan B está en el README.
+- ⏳ Montar WordPress + WooCommerce + plugin Dropify, importar productos y configurar las variables en Vercel.
 
 ## Pendiente / próximos trabajos
 
-- **Productos con variaciones** (`type: "VARIABLE"`): el plugin envía `variation_id` en cada producto del pedido. Hoy el catálogo los omite.
-- **Varios proveedores en un pedido:** hoy va todo con el `supplier_id` del primero, igual que el plugin. Evaluar separar el pedido por proveedor.
-- Anti-spam en el checkout (Cloudflare Turnstile) y límite de pedidos por IP.
-- Costo de envío visible al cliente: Dropi lo calcula, pero la app no lo muestra.
-- Seguimiento de la guía en "Mis pedidos".
+- Anti-spam en el checkout (Cloudflare Turnstile) y límite de pedidos por IP en `/api/pedidos`.
+- Costo de envío: hoy solo se muestra el total de productos ("se confirma al despachar").
 - Marca: el nombre "Tienda", los colores (`--color-brand: #e4572e`) y los íconos de `public/` son provisionales.
-- Llevar al repo la prueba E2E con Playwright (se corrió fuera del proyecto).
+- Índice de idempotencia más robusto que "últimos 50 pedidos".
+- Pruebas automatizadas en el repo (la prueba E2E se corrió con Playwright fuera del proyecto).
 
 ## Comandos
 
@@ -124,7 +112,6 @@ npm run dev     # desarrollo, sin service worker
 npm run build   # next build && serwist build serwist.config.mjs → genera public/sw.js
 npm start       # producción local, con modo offline
 npm run lint
-node scripts/mock-dropi.mjs   # Dropi simulado en :3200 (token: token-prueba)
 ```
 
 `public/sw.js` es un archivo generado: está en `.gitignore` y en los ignores de ESLint. No lo edites; edita `src/app/sw.ts`.
