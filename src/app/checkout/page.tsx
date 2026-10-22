@@ -151,7 +151,7 @@ export default function CheckoutPage() {
           </Step>
         </form>
 
-        <aside className="space-y-4 lg:sticky lg:top-24">
+        <aside className="space-y-4 lg:sticky lg:top-28">
           <div className="rounded-3xl border border-line bg-card p-4">
             <h2 className="font-display font-bold">Tu pedido</h2>
             <ul className="mt-3 space-y-3">

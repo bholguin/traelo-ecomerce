@@ -63,14 +63,14 @@ export function ProductDetail() {
   }
 
   return (
-    <div className="pb-24 sm:pb-0">
+    <div>
       <Link href="/" className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-muted hover:text-ink">
         <ArrowLeftIcon width={16} height={16} />
         Tienda
       </Link>
 
       <div className="grid gap-6 md:grid-cols-2 md:gap-12">
-        <div className="md:sticky md:top-24 md:self-start">
+        <div className="md:sticky md:top-28 md:self-start">
           <div className="relative aspect-square overflow-hidden rounded-[2rem] bg-soft">
             <ViewTransition name={`producto-${product.id}`} share="morph" default="none">
               <ProductImage src={product.images[photo]} name={product.name} id={product.id} />
@@ -151,10 +151,13 @@ export function ProductDetail() {
             </div>
           )}
 
-          {/* En celular: barra fija abajo. En escritorio: en línea. */}
+          {/* En celular: sticky, se queda pegada abajo mientras se lee la ficha. Va en el
+              flujo normal y sin backdrop-filter: si sticky falla, sigue visible en su
+              lugar; las barras fixed con desenfoque fallan en algunos navegadores
+              integrados (Instagram, Facebook). En escritorio: en línea. */}
           {product.inStock ? (
             <div
-              className="fixed inset-x-3 z-30 flex gap-2 rounded-full border border-line/70 bg-card/90 p-2 shadow-xl shadow-ink/10 backdrop-blur-xl sm:static sm:mt-8 sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none sm:backdrop-blur-none"
+              className="sticky z-30 mt-8 flex gap-2 rounded-full border border-line bg-card p-2 shadow-xl shadow-ink/10 sm:static sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none"
               style={{ bottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }}
             >
               <div className="flex h-12 items-center rounded-full bg-soft">

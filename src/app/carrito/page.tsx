@@ -83,7 +83,7 @@ export default function CarritoPage() {
           ))}
         </ul>
 
-        <aside className="rounded-3xl bg-ink p-5 text-surface lg:sticky lg:top-24">
+        <aside className="rounded-3xl bg-ink p-5 text-surface lg:sticky lg:top-28">
           <dl className="space-y-2 text-sm">
             <div className="flex justify-between">
               <dt className="text-surface/70">Productos</dt>

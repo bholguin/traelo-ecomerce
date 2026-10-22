@@ -42,7 +42,7 @@ export function Catalog() {
         </p>
       )}
 
-      <div className="sticky top-16 z-20 -mx-4 flex flex-col gap-3 bg-surface/85 px-4 py-3 backdrop-blur-xl sm:flex-row sm:items-center">
+      <div className="sticky top-20 z-20 -mx-4 flex flex-col gap-3 bg-surface/85 px-4 py-3 backdrop-blur-xl sm:flex-row sm:items-center">
         <label className="relative block sm:w-80">
           <span className="sr-only">Buscar productos</span>
           <SearchIcon className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-muted" />

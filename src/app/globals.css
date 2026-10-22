@@ -19,6 +19,25 @@
   --animate-bump: bump 350ms ease-out;
 }
 
+/* Respaldo para navegadores sin oklch (iOS < 15.4, Android viejos): sin esto
+   los colores quedan transparentes y botones como "Agregar" se vuelven invisibles. */
+@supports not (color: oklch(0 0 0)) {
+  :root {
+    --color-brand: #f0592b;
+    --color-brand-2: #e0234f;
+    --color-lime: #c8ee3c;
+    --color-ink: #1e1814;
+    --color-muted: #6b625b;
+    --color-surface: #fbf9f5;
+    --color-card: #ffffff;
+    --color-soft: #f2eee8;
+    --color-line: #e3ddd4;
+    --color-ok: #1f9152;
+    --color-warn: #f2b33d;
+    --color-bad: #c8372d;
+  }
+}
+
 @keyframes bump {
   40% {
     scale: 1.35;

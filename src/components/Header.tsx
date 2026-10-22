@@ -25,12 +25,14 @@ export function Header() {
   return (
     <>
       <header className="sticky top-0 z-30 border-b border-line/70 bg-surface/75 backdrop-blur-xl backdrop-saturate-150">
-        <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4">
-          <Link href="/" className="flex items-center gap-2" aria-label={`${APP_NAME}, inicio`}>
-            <span className="grid size-9 place-items-center rounded-xl bg-linear-to-br from-brand to-brand-2 font-display text-lg font-black text-white shadow-md shadow-brand/30">
+        <div className="mx-auto flex h-20 max-w-6xl items-center gap-4 px-4">
+          <Link href="/" className="flex items-center gap-2.5" aria-label={`${APP_NAME}, inicio`}>
+            <span className="grid size-12 place-items-center rounded-2xl bg-linear-to-br from-brand to-brand-2 font-display text-2xl font-black text-white shadow-lg shadow-brand/30">
               {APP_NAME[0].toLowerCase()}
             </span>
-            <span className="font-display text-xl font-extrabold tracking-tight">{APP_NAME.toLowerCase()}</span>
+            <span className="font-display text-[1.75rem] leading-none font-extrabold tracking-tight">
+              {APP_NAME.toLowerCase()}
+            </span>
           </Link>
 
           <nav className="ml-4 hidden gap-1 sm:flex" aria-label="Principal">
@@ -67,12 +69,14 @@ export function Header() {
               <span className={online ? "hidden sm:inline" : ""}>{online ? "En línea" : "Sin señal"}</span>
             </span>
 
+            {/* Visible en todos los tamaños: en la ficha y el checkout no hay barra inferior. */}
             <Link
               href="/carrito"
-              className="hidden h-11 items-center gap-2 rounded-full bg-ink px-4 text-sm font-semibold text-surface transition-transform active:scale-95 sm:flex"
+              aria-label={`Carrito${cartCount > 0 ? `, ${cartCount} productos` : ""}`}
+              className="relative flex h-11 items-center gap-2 rounded-full bg-ink px-3.5 text-sm font-semibold text-surface transition-transform active:scale-95 sm:px-4"
             >
-              <BagIcon width={18} height={18} />
-              Carrito
+              <BagIcon width={20} height={20} />
+              <span className="hidden sm:inline">Carrito</span>
               {cartCount > 0 && (
                 <span key={cartCount} className="animate-bump rounded-full bg-lime px-1.5 text-xs font-bold text-ink">
                   {cartCount}
@@ -104,18 +108,18 @@ export function Header() {
                 key={n.href}
                 href={n.href}
                 aria-current={active ? "page" : undefined}
-                className={`relative flex h-12 flex-1 items-center justify-center gap-1.5 rounded-full text-sm font-semibold transition-colors ${
+                className={`relative flex h-14 flex-1 flex-col items-center justify-center gap-0.5 rounded-full text-xs font-semibold transition-colors ${
                   active ? "bg-ink text-surface" : "text-muted"
                 }`}
               >
-                <n.icon width={20} height={20} />
-                <span className={active ? "" : "sr-only"}>{n.label}</span>
+                <n.icon width={22} height={22} />
+                {n.label}
                 {n.badge > 0 && (
                   <span
                     key={n.badge}
-                    className={`absolute top-1 right-[calc(50%-1.4rem)] min-w-5 animate-bump rounded-full px-1 text-center text-[11px] leading-5 font-bold ${
-                      n.href === "/pedidos" ? "bg-warn text-ink" : "bg-lime text-ink"
-                    } ${active ? "hidden" : ""}`}
+                    className={`absolute top-1 left-[calc(50%+0.4rem)] min-w-5 animate-bump rounded-full px-1 text-center text-[11px] leading-5 font-bold ring-2 ${
+                      active ? "ring-ink" : "ring-card"
+                    } ${n.href === "/pedidos" ? "bg-warn text-ink" : "bg-lime text-ink"}`}
                   >
                     {n.badge}
                   </span>
