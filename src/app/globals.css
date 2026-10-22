@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand: #e4572e;
+  --color-ink: #1d1b19;
+  --color-muted: #6f6a64;
+  --color-surface: #fffdf9;
+  --color-soft: #f3eee7;
+  --color-line: #e7e0d6;
+  --color-ok: #2f9e62;
+  --color-warn: #f2b33d;
+  --color-bad: #c8372d;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background: var(--color-surface);
+  color: var(--color-ink);
+}
+
+/* Espacio para la barra inferior en celular y el área segura del iPhone */
+main {
+  padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+}
+@media (min-width: 640px) {
+  main {
+    padding-bottom: 3rem;
+  }
+}
+
+input,
+select,
+textarea {
+  font-size: 16px; /* evita el zoom automático en iOS */
+}
