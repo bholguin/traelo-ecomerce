@@ -44,7 +44,8 @@ export type QueuedOrder = {
   status: OrderStatus;
   items: CartItem[];
   customer: Customer;
-  total: number;
+  total: number; // valor de los productos: se paga contra entrega
+  shipping?: number | null; // envío, se paga al confirmar; null = por confirmar. Falta en pedidos viejos
   attempts: number;
   nextAttemptAt: number;
   remoteId?: number;
@@ -64,8 +65,9 @@ export type OrderPayload = {
   clientOrderId: string;
   items: { productId: number; quantity: number; price: number }[];
   customer: Customer;
+  shipping?: number | null; // el valor de envío que el cliente vio y aceptó
 };
 
 export type OrderResponse =
-  | { ok: true; orderId: number; total: number; duplicated?: boolean; demo?: boolean }
+  | { ok: true; orderId: number; total: number; shipping: number | null; duplicated?: boolean; demo?: boolean }
   | { ok: false; kind: "validation" | "business"; message: string };

@@ -2,9 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { CashIcon, CheckIcon, OfflineIcon } from "@/components/Icons";
+import { CashIcon, OfflineIcon, TruckIcon } from "@/components/Icons";
+import { envioLabel, notaPagoEnvio, PagoResumen } from "@/components/PagoResumen";
 import { ProductImage } from "@/components/ProductImage";
 import { DEPARTAMENTOS } from "@/lib/colombia";
+import { costoEnvio } from "@/lib/envio";
 import { formatCOP } from "@/lib/format";
 import { useCart, useOnline } from "@/lib/hooks";
 import { enqueueOrder } from "@/lib/sync";
@@ -40,6 +42,10 @@ export default function CheckoutPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  // El envío depende del destino: se recalcula al elegir departamento y ciudad.
+  const [department, setDepartment] = useState("");
+  const [city, setCity] = useState("");
+  const envio = department ? costoEnvio(department, city) : undefined;
 
   const empty = cart !== undefined && cart.length === 0 && !sending;
   useEffect(() => {
@@ -110,7 +116,13 @@ export default function CheckoutPage() {
 
           <Step n={2} title="¿Dónde lo entregamos?">
             <Field label="Departamento">
-              <select name="department" required defaultValue="" className={field}>
+              <select
+                name="department"
+                required
+                value={department}
+                onChange={(e) => setDepartment(e.target.value)}
+                className={field}
+              >
                 <option value="" disabled>
                   Elige uno
                 </option>
@@ -120,7 +132,14 @@ export default function CheckoutPage() {
               </select>
             </Field>
             <Field label="Ciudad o municipio">
-              <input name="city" required autoComplete="address-level2" className={field} />
+              <input
+                name="city"
+                required
+                autoComplete="address-level2"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                className={field}
+              />
             </Field>
             <Field label="Dirección completa y barrio" wide>
               <input name="address" required autoComplete="street-address" className={field} />
@@ -136,16 +155,31 @@ export default function CheckoutPage() {
           </Step>
 
           <Step n={3} title="Pago">
-            <div className="flex items-center gap-3 rounded-2xl border-2 border-ink bg-card p-4 sm:col-span-2">
+            <div className="flex items-start gap-3 rounded-2xl border-2 border-ink bg-card p-4 sm:col-span-2">
+              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-ink text-lime">
+                <TruckIcon />
+              </span>
+              <span className="flex-1">
+                <span className="flex justify-between gap-2 font-semibold">
+                  Envío: lo pagas al confirmar
+                  <span className="text-right tabular-nums">{envioLabel(envio)}</span>
+                </span>
+                {/* Cuando exista la pasarela de pagos, aquí va el pago en línea del envío. */}
+                <span className="block text-sm text-muted">
+                  {envio === undefined ? "Elige el departamento para calcularlo." : notaPagoEnvio(envio)}
+                </span>
+              </span>
+            </div>
+            <div className="flex items-start gap-3 rounded-2xl border border-line bg-card p-4 sm:col-span-2">
               <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-lime text-ink">
                 <CashIcon />
               </span>
               <span className="flex-1">
-                <span className="block font-semibold">Contra entrega</span>
-                <span className="block text-sm text-muted">Pagas en efectivo cuando recibes el pedido.</span>
-              </span>
-              <span className="grid size-6 place-items-center rounded-full bg-ink text-surface">
-                <CheckIcon width={14} height={14} />
+                <span className="flex justify-between gap-2 font-semibold">
+                  Productos: contra entrega
+                  <span className="tabular-nums">{formatCOP(total)}</span>
+                </span>
+                <span className="block text-sm text-muted">Los pagas en efectivo cuando recibes el pedido.</span>
               </span>
             </div>
           </Step>
@@ -167,17 +201,16 @@ export default function CheckoutPage() {
                 </li>
               ))}
             </ul>
-            <div className="mt-4 flex items-baseline justify-between border-t border-line pt-3">
-              <span className="text-sm text-muted">Total productos</span>
-              <span className="font-display text-xl font-black tabular-nums">{formatCOP(total)}</span>
+            <div className="mt-4 border-t border-line pt-3">
+              <PagoResumen productos={total} envio={envio} />
             </div>
-            <p className="mt-1 text-xs text-muted">El envío se confirma al despachar.</p>
           </div>
 
           {!online && (
             <p className="flex gap-3 rounded-3xl bg-soft p-4 text-sm">
               <OfflineIcon className="mt-0.5 shrink-0" />
-              Estás sin señal. Tu pedido se guarda en el celular y se envía solo cuando vuelva la conexión.
+              Estás sin señal. Tu pedido se guarda en el celular y se envía solo cuando vuelva la conexión. Después
+              coordinamos contigo el pago del envío.
             </p>
           )}
 
@@ -193,7 +226,7 @@ export default function CheckoutPage() {
             className="flex h-14 w-full items-center justify-between rounded-full bg-ink px-6 font-semibold text-surface transition-transform active:scale-[0.98] disabled:opacity-60"
           >
             <span>{sending ? "Guardando…" : online ? "Confirmar pedido" : "Guardar pedido"}</span>
-            <span className="font-display tabular-nums">{formatCOP(total)}</span>
+            <span className="font-display tabular-nums">{formatCOP(total + (envio ?? 0))}</span>
           </button>
         </aside>
       </div>

@@ -4,7 +4,7 @@ Lee también `AGENTS.md`: esta es Next.js 16.4 y sus APIs difieren de versiones 
 
 ## Qué es
 
-Una PWA responsive para Colombia. Vende productos del catálogo de **Dropi** (dropshipping colombiano) con **pago contra entrega**. Tiene dos requisitos centrales:
+Una PWA responsive para Colombia. Vende productos del catálogo de **Dropi** (dropshipping colombiano). **El producto se paga contra entrega y el envío se paga al confirmar el pedido.** Tiene dos requisitos centrales:
 - **SSR primero, por SEO:** todo lo público (inicio, categorías, fichas) se renderiza en el servidor con datos de Woo, para que Google lo indexe.
 - **Funcionar sin conexión:** el cliente arma el carrito y confirma el pedido sin señal, y el pedido se envía solo cuando vuelve la red. El offline es una capa encima del SSR, no la base.
 
@@ -29,7 +29,7 @@ Celular (PWA Next.js) ──pedidos──▶ /api/pedidos (Vercel) ──REST v3
 | **SSR primero** (desde la Fase 0 del plan SEO) | Elección del usuario: usar Next por su SSR y posicionar los productos en Google. El offline se mantiene como mejora progresiva |
 | Next.js + Vercel | Elección del usuario; los route handlers reemplazan a un mini-plugin de WordPress |
 | WooCommerce como intermediario con Dropi | La integración la resuelve el plugin oficial; evita depender de una API no documentada |
-| Solo pago contra entrega | Es el modelo nativo de Dropi; no hay pagos en línea en el MVP |
+| Producto contra entrega + envío prepagado al confirmar | Decisión del usuario: reduce pedidos falsos y devoluciones (cada rechazo cuesta flete). Hoy el envío se cobra coordinando con el cliente; **en el futuro, con pasarela de pagos** |
 | Sin cuentas de cliente ni login | Fuera del MVP |
 | Llaves de Woo solo en variables de entorno de Vercel | Nunca en el navegador ni con prefijo `NEXT_PUBLIC_` |
 | Serwist para el service worker | Sucesor mantenido de next-pwa; se construye después de `next build` para precachear las rutas prerenderizadas |
@@ -100,7 +100,9 @@ Estados (`OrderStatus` en `types.ts`): `pendiente` → `enviando` → `enviado`.
 
 - Nunca confiar en el precio del cliente. Se recalcula con la Store API. Si el precio cambió, el producto está agotado o falta stock, responde 409 `business`.
 - Celular colombiano: 10 dígitos que empiezan por 3.
-- El pedido se crea con `status: "processing"`, `payment_method: "cod"` y `set_paid: false`, con billing y shipping iguales (`state` = departamento, `country` = "CO").
+- El pedido se crea con `status: "on-hold"` (falta el pago del envío), `payment_method: "cod"` (el producto) y `set_paid: false`, con billing y shipping iguales (`state` = departamento, `country` = "CO"). Si hay tarifa para el destino, lleva una línea de envío (`shipping_lines`, `flat_rate`). El meta `_pwa_envio` dice "pendiente de pago" o "por cotizar". Al confirmar el pago del envío se pasa a mano a "Procesando".
+- Envío **por destino**: `costoEnvio(departamento, ciudad)` en `src/lib/envio.ts`, con la tabla `src/config/envios.ts` (ciudad → departamento → por defecto). **Las tarifas aún no están definidas**: con la tabla vacía, todo destino sale "Por confirmar" (`null`) y el valor se coordina con el cliente. El carrito muestra "Según tu destino" y el checkout lo recalcula al elegir departamento y ciudad. El cliente envía el valor que vio (`shipping`) y el servidor lo recalcula con la misma tabla: si no coincide, responde 409 `business`. En la respuesta, `total` es lo que se recauda contra entrega (productos) y `shipping` va aparte.
+- Fase 0 (Dropi): verificar que el plugin cree el pedido al pasar de "En espera" a "Procesando" y que el **valor a recaudar sea solo el de los productos**. Si el plugin suma el envío, el transportador lo cobraría dos veces.
 
 ## Variables de entorno
 
@@ -122,7 +124,8 @@ Estados (`OrderStatus` en `types.ts`): `pendiente` → `enviando` → `enviado`.
   - **Fase 3:** contenido propio por producto (título ≤ 60, meta ≤ 155, descripción propia, alt en fotos, 3 FAQ) y feed de Merchant Center con URLs `/p/`.
   - **Fase 4:** Core Web Vitals (CrUX) y analítica.
 - Anti-spam en el checkout (Cloudflare Turnstile) y límite de pedidos por IP en `/api/pedidos`.
-- Costo de envío: hoy solo se muestra el total de productos ("se confirma al despachar").
+- **Pasarela de pagos para el envío.** Puntos de enganche: el paso 3 del checkout, el meta `_pwa_envio` en Woo y la nota "falta el pago del envío" en Mis pedidos. Ojo con el offline: el pedido se puede armar sin señal, pero el pago necesita red, así que el flujo debe ser guardar → sincronizar → pagar.
+- Definir las tarifas de envío por destino (llenar `src/config/envios.ts`, o reemplazar `costoEnvio()` si salen de Dropi o de una transportadora). Para tarifas por ciudad conviene un selector de municipios, porque hoy la ciudad se escribe a mano.
 - Marca: el nombre "Tráelo" (`src/lib/brand.ts`) es provisional. Los íconos (`public/icon-*.png`, `src/app/apple-icon.png`, `src/app/favicon.ico`) se generaron del logo del encabezado: degradado `brand` → `brand-2`, radio de 1/3 del lado y "t" blanca a la mitad del alto. El maskable y el de iPhone van a sangre, sin esquinas, porque el sistema recorta su propia forma. Colores en `oklch` en `globals.css`; los botones principales van en `ink` porque el texto blanco sobre `brand` no da contraste AA.
 - Diseño: la foto viaja del catálogo a la ficha con `<ViewTransition name="producto-{id}" share="morph">`, que solo forma pareja si la ficha llega en el mismo commit que la navegación (fichas prerenderizadas y prefetcheadas). Las tarjetas aparecen con scroll-driven animations (`.reveal`), sin respaldo porque es decorativo. En `.text-gradient` usa `background-image`, no el atajo `background`.
 - Índice de idempotencia más robusto que "últimos 50 pedidos".

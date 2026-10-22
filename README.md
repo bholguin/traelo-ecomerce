@@ -1,6 +1,6 @@
 # Tienda PWA offline · WooCommerce + Dropi
 
-PWA en Next.js 16 que muestra el catálogo de Dropi, toma pedidos contra entrega **aun sin conexión** y los envía a WooCommerce cuando vuelve la señal. El plugin oficial de Dropi para WooCommerce (Dropify) crea el pedido en Dropi.
+PWA en Next.js 16 que muestra el catálogo de Dropi, toma pedidos **aun sin conexión** (producto contra entrega, envío pagado al confirmar) y los envía a WooCommerce cuando vuelve la señal. El plugin oficial de Dropi para WooCommerce (Dropify) crea el pedido en Dropi.
 
 ```
 Celular (PWA) ──pedidos──▶ /api/pedidos (Vercel) ──REST──▶ WooCommerce ──plugin Dropify──▶ Dropi
@@ -49,9 +49,12 @@ El plugin de Dropi crea el pedido en Dropi cuando WooCommerce lo registra. **No 
 
 Prueba:
 
-1. Configura las variables y haz un pedido real desde la PWA.
-2. Revisa que aparezca en WooCommerce **y** en tu panel de Dropi.
-3. Si aparece en Woo pero no en Dropi: abre el pedido en Woo y cámbiale el estado a mano (Procesando → En espera → Procesando). Si eso lo dispara, el plugin escucha cambios de estado y basta con crear el pedido en `pending` y luego pasarlo a `processing` (ajuste en `src/lib/woo.ts`). Si tampoco, hay que preguntar a soporte de Dropi qué hook usa el plugin.
+La app crea el pedido en Woo **"En espera"** porque el envío se paga al confirmar y todavía no está pagado. Cuando confirmas el pago del envío, lo pasas a mano a **"Procesando"**.
+
+1. Configura las variables y haz un pedido real desde la PWA. Debe aparecer en Woo "En espera", con una línea de envío.
+2. Cámbialo a "Procesando" y revisa que aparezca en tu panel de Dropi.
+3. En Dropi, revisa el **valor a recaudar**: debe ser solo el de los productos. Si incluye el envío, el transportador cobraría el envío dos veces. En ese caso hay que ajustar cómo se registra el envío en Woo (por ejemplo, como nota y no como línea de envío) o configurarlo en el plugin.
+4. Si el pedido no llega a Dropi al pasarlo a "Procesando", hay que preguntar a soporte de Dropi qué evento escucha el plugin.
 
 ## Estructura
 
@@ -76,5 +79,5 @@ serwist.config.mjs
 ## Pendiente para producción
 
 - Anti-spam en el checkout (por ejemplo Cloudflare Turnstile) y límite de pedidos por IP.
-- Costo de envío: Dropi lo calcula al despachar; la app muestra solo el total de productos.
+- Costo de envío: depende del destino y las tarifas aún no están definidas (`src/config/envios.ts`); mientras tanto sale "Por confirmar". El cobro del envío se coordina a mano hasta integrar una pasarela de pagos.
 - Reemplazar el nombre "Tienda", los colores y los íconos de `public/`.

@@ -103,6 +103,7 @@ type WcOrder = {
   id: number;
   status: string;
   total: string;
+  shipping_total?: string;
   meta_data: { key: string; value: unknown }[];
 };
 
@@ -141,6 +142,7 @@ export async function createCodOrder(input: {
   clientOrderId: string;
   customer: Customer;
   lines: { productId: number; quantity: number }[];
+  shipping: number | null; // envío prepagado (se cobra aparte del contra entrega)
 }): Promise<WcOrder> {
   const c = input.customer;
   const address = {
@@ -156,20 +158,29 @@ export async function createCodOrder(input: {
   return wcRest<WcOrder>("/orders", {
     method: "POST",
     body: JSON.stringify({
-      // "processing" es el estado que deja un checkout contra entrega normal.
-      // VERIFICAR EN FASE 0 que el plugin de Dropi crea el pedido en Dropi
-      // también para pedidos creados por la REST API (ver README).
-      status: "processing",
+      // "on-hold" (En espera): el envío se paga al confirmar y todavía no está
+      // pagado. Al confirmar el pago, pasa el pedido a "Procesando" en Woo.
+      // VERIFICAR EN FASE 0: que el plugin de Dropi cree el pedido en Dropi al
+      // cambiar de "En espera" a "Procesando", y que el valor a recaudar sea solo
+      // el de los productos (sin el envío, que ya se pagó). Ver README.
+      status: "on-hold",
       payment_method: "cod",
-      payment_method_title: "Pago contra entrega",
+      payment_method_title: "Producto contra entrega · envío prepagado",
       set_paid: false,
       billing: address,
       shipping: address,
       customer_note: c.notes ?? "",
       line_items: input.lines.map((l) => ({ product_id: l.productId, quantity: l.quantity })),
+      ...(input.shipping && {
+        shipping_lines: [
+          { method_id: "flat_rate", method_title: "Envío (se paga al confirmar)", total: String(input.shipping) },
+        ],
+      }),
       meta_data: [
         { key: CLIENT_ORDER_META, value: input.clientOrderId },
         { key: "_pwa_origen", value: "pwa" },
+        // Cuando exista pasarela de pagos, aquí quedará la referencia del pago.
+        { key: "_pwa_envio", value: input.shipping ? "pendiente de pago" : "por cotizar" },
       ],
     }),
   });

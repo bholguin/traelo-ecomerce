@@ -23,7 +23,8 @@ const STATUS: Record<OrderStatus, { label: string; tone: string }> = {
 const REMOTE_STATUS: Record<string, { label: string; tone: string }> = {
   pending: { label: "Recibido", tone: "bg-ok/15 text-ok" },
   processing: { label: "En preparación", tone: "bg-ok/15 text-ok" },
-  "on-hold": { label: "En espera", tone: "bg-warn/25 text-ink" },
+  // Los pedidos se crean "En espera" hasta que se paga el envío.
+  "on-hold": { label: "Falta pagar el envío", tone: "bg-warn/25 text-ink" },
   completed: { label: "Entregado", tone: "bg-ok/15 text-ok" },
   cancelled: { label: "Cancelado", tone: "bg-bad/10 text-bad" },
   refunded: { label: "Reembolsado", tone: "bg-bad/10 text-bad" },
@@ -38,12 +39,19 @@ function statusBadge(o: QueuedOrder) {
   return REMOTE_STATUS[o.remoteStatus] ?? REMOTE_FALLBACK;
 }
 
+// Pedidos del modelo actual (con envío) que aún no han pasado a "Procesando" en Woo.
+// Los viejos (sin envío) se crearon ya en "Procesando" y no muestran la nota.
+const awaitingShipping = (o: QueuedOrder) =>
+  o.shipping !== undefined &&
+  o.status !== "revision" &&
+  (!o.remoteStatus || o.remoteStatus === "on-hold" || o.remoteStatus === "pending");
+
 const STEPS = ["Guardado", "Recibido", "En preparación", "Entregado"];
 
 // Paso actual de la línea de tiempo, o null si el pedido se cerró sin entregar.
 function stepOf(o: QueuedOrder): number | null {
   if (o.status !== "enviado") return 0;
-  if (!o.remoteStatus || o.remoteStatus === "pending") return 1;
+  if (!o.remoteStatus || o.remoteStatus === "pending" || o.remoteStatus === "on-hold") return 1;
   if (o.remoteStatus === "completed") return 3;
   if (CLOSED.includes(o.remoteStatus)) return null;
   return 2;
@@ -67,7 +75,8 @@ export function Orders() {
           </span>
           <p className="mt-3 font-display text-xl font-bold">¡Pedido guardado!</p>
           <p className="mt-1 text-sm text-surface/75">
-            Está seguro en tu celular. Si no hay señal, se enviará solo cuando vuelva.
+            Está seguro en tu celular y, si no hay señal, se enviará solo cuando vuelva. Para despacharlo falta el
+            pago del envío: te contactaremos al celular que registraste.
           </p>
         </div>
       )}
@@ -141,12 +150,26 @@ export function Orders() {
                   </ol>
                 )}
 
-                <div className="mt-4 flex items-center justify-between border-t border-line pt-3">
+                <div className="mt-4 flex items-end justify-between gap-3 border-t border-line pt-3">
                   <span className="text-sm text-muted">
                     {o.customer.city}, {o.customer.department}
                   </span>
-                  <span className="font-display font-bold tabular-nums">{formatCOP(o.total)}</span>
+                  <span className="text-right">
+                    <span className="block font-display font-bold tabular-nums">{formatCOP(o.total)}</span>
+                    <span className="block text-xs text-muted">
+                      al recibir{o.shipping ? ` · envío ${formatCOP(o.shipping)}` : ""}
+                    </span>
+                  </span>
                 </div>
+
+                {awaitingShipping(o) && (
+                  <p className="mt-3 rounded-2xl bg-warn/15 p-3 text-xs text-ink">
+                    Para despachar este pedido falta el pago del envío.{" "}
+                    {o.shipping === null
+                      ? "Te contactaremos al celular que registraste para confirmarte su valor y coordinar el pago."
+                      : "Te contactaremos al celular que registraste para coordinarlo."}
+                  </p>
+                )}
 
                 {o.message && (
                   <p

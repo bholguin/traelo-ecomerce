@@ -5,7 +5,7 @@ import { discountOf, formatCOP, slugify } from "@/lib/format";
 import type { Product } from "@/lib/types";
 
 const PERKS = [
-  { icon: CashIcon, title: "Pagas al recibir", text: "En efectivo, cuando lo tengas en la mano." },
+  { icon: CashIcon, title: "Producto contra entrega", text: "En efectivo al recibirlo. El envío se paga al pedir." },
   { icon: TruckIcon, title: "Toda Colombia", text: "Te lo llevamos a tu municipio." },
   { icon: OfflineIcon, title: "Sin señal", text: "Tu pedido se guarda y sale solo." },
 ];

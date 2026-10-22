@@ -1,4 +1,5 @@
 import { DEMO_PRODUCTS } from "@/lib/demo-products";
+import { costoEnvio } from "@/lib/envio";
 import type { Customer, OrderPayload, OrderResponse, Product } from "@/lib/types";
 import {
   createCodOrder,
@@ -34,6 +35,7 @@ function validate(body: unknown): { ok: true; data: OrderPayload } | { ok: false
     ok: true,
     data: {
       clientOrderId: b.clientOrderId,
+      shipping: typeof b.shipping === "number" ? b.shipping : null,
       items: b.items.map((i) => ({ productId: i.productId, quantity: i.quantity, price: Number(i.price) || 0 })),
       customer: {
         firstName: c.firstName!.trim(),
@@ -70,18 +72,29 @@ export async function POST(request: Request) {
   if (!parsed.ok) return json({ ok: false, kind: "validation", message: parsed.message }, 400);
   const payload = parsed.data;
 
+  // El envío se paga al confirmar y depende del destino: el cliente tuvo que ver
+  // y aceptar el mismo valor que calcula el servidor para su dirección.
+  const shipping = costoEnvio(payload.customer.department, payload.customer.city);
+  if ((payload.shipping ?? null) !== shipping) {
+    return json(
+      { ok: false, kind: "business", message: "El valor del envío cambió; revisa el pedido antes de confirmarlo" },
+      409,
+    );
+  }
+
   // ---- Modo demo: sin WooCommerce configurado ----
   if (!wooConfigured()) {
     const catalog = new Map(DEMO_PRODUCTS.map((p) => [p.id, p]));
     const check = checkLines(payload, catalog);
     if (!check.ok) return json({ ok: false, kind: "business", message: check.message }, 409);
-    return json({ ok: true, orderId: 0, total: check.total, demo: true });
+    return json({ ok: true, orderId: 0, total: check.total, shipping, demo: true });
   }
 
   try {
     const existing = await findOrderByClientId(payload.clientOrderId);
     if (existing) {
-      return json({ ok: true, orderId: existing.id, total: Number(existing.total), duplicated: true });
+      const paid = Number(existing.shipping_total) || null;
+      return json({ ok: true, orderId: existing.id, total: Number(existing.total) - (paid ?? 0), shipping: paid, duplicated: true });
     }
 
     const catalog = await fetchProductsByIds(payload.items.map((i) => i.productId));
@@ -92,8 +105,10 @@ export async function POST(request: Request) {
       clientOrderId: payload.clientOrderId,
       customer: payload.customer,
       lines: payload.items,
+      shipping,
     });
-    return json({ ok: true, orderId: order.id, total: Number(order.total) });
+    // total = lo que se recauda contra entrega (productos); el envío va aparte.
+    return json({ ok: true, orderId: order.id, total: check.total, shipping });
   } catch (e) {
     console.error("[pedidos]", e);
     // 502 → la PWA lo trata como error temporal y reintenta.

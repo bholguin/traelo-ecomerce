@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ArrowRightIcon, BagIcon, MinusIcon, PlusIcon, ShieldIcon, TrashIcon } from "@/components/Icons";
+import { PagoResumen } from "@/components/PagoResumen";
 import { ProductImage } from "@/components/ProductImage";
 import { setCartQuantity } from "@/lib/db";
 import { formatCOP } from "@/lib/format";
@@ -84,20 +85,8 @@ export default function CarritoPage() {
         </ul>
 
         <aside className="rounded-3xl bg-ink p-5 text-surface lg:sticky lg:top-28">
-          <dl className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <dt className="text-surface/70">Productos</dt>
-              <dd className="tabular-nums">{formatCOP(total)}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-surface/70">Envío</dt>
-              <dd>Se confirma al despachar</dd>
-            </div>
-            <div className="flex items-baseline justify-between border-t border-surface/15 pt-3">
-              <dt className="font-semibold">Total productos</dt>
-              <dd className="font-display text-2xl font-black tabular-nums">{formatCOP(total)}</dd>
-            </div>
-          </dl>
+          {/* El envío depende del destino: se calcula en el checkout. */}
+          <PagoResumen productos={total} envio={undefined} tone="dark" />
           <Link
             href="/checkout"
             className="mt-5 flex h-13 items-center justify-center gap-2 rounded-full bg-lime font-semibold text-ink transition-transform active:scale-[0.98]"
@@ -107,7 +96,7 @@ export default function CarritoPage() {
           </Link>
           <p className="mt-4 flex items-center justify-center gap-2 text-xs text-surface/70">
             <ShieldIcon width={16} height={16} />
-            No pagas nada ahora: pagas al recibir.
+            El producto lo pagas cuando lo tienes en la mano.
           </p>
         </aside>
       </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { db } from "./db";
+import { costoEnvio } from "./envio";
 import {
   FINAL_REMOTE_STATUSES,
   type Customer,
@@ -45,6 +46,7 @@ export async function enqueueOrder(customer: Customer): Promise<QueuedOrder> {
     items,
     customer,
     total: items.reduce((sum, i) => sum + i.price * i.quantity, 0),
+    shipping: costoEnvio(customer.department, customer.city),
     attempts: 0,
     nextAttemptAt: 0,
   };
@@ -99,6 +101,7 @@ async function sendOrder(order: QueuedOrder) {
     clientOrderId: order.clientOrderId,
     customer: order.customer,
     items: order.items.map((i) => ({ productId: i.productId, quantity: i.quantity, price: i.price })),
+    shipping: order.shipping,
   };
 
   try {
@@ -114,6 +117,7 @@ async function sendOrder(order: QueuedOrder) {
         status: "enviado",
         remoteId: data.orderId,
         total: data.total,
+        shipping: data.shipping,
         message: data.demo ? "Modo demo: no se creó en WooCommerce" : undefined,
       });
       return;
