@@ -53,14 +53,9 @@ body {
   color: var(--color-ink);
 }
 
-/* Espacio para la barra flotante inferior en celular y el área segura del iPhone */
+/* El espacio para la barra flotante inferior (celular) lo deja el Footer. */
 main {
-  padding-bottom: calc(6.5rem + env(safe-area-inset-bottom));
-}
-@media (min-width: 640px) {
-  main {
-    padding-bottom: 4rem;
-  }
+  padding-bottom: 3rem;
 }
 
 input,

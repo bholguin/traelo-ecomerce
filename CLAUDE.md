@@ -50,6 +50,7 @@ src/app/
   c/[slug]/page.tsx        categoría SSR
   buscar/page.tsx          búsqueda SSR (?q=), noindex
   robots.ts  opengraph-image.tsx   robots (todo bloqueado si !indexable()) e imagen para compartir
+  terminos/  privacidad/    términos y política de datos (borradores legales; datos de la tienda en src/config/legal.ts, piezas en components/Legal.tsx)
   carrito/  checkout/  pedidos/   cliente, leen IndexedDB (se precachean)
   offline/                 respaldo del SW: según la URL pedida muestra ficha o catálogo desde IndexedDB
   producto/page.tsx        ficha offline heredada (/producto?id=), noindex
@@ -123,6 +124,7 @@ Estados (`OrderStatus` en `types.ts`): `pendiente` → `enviando` → `enviado`.
   - **Fase 2** (con Woo): `generateMetadata` completo (canonical, OG con foto), JSON-LD `Product` + `Offer` y `BreadcrumbList`, `sitemap.ts`, webhook de Woo → `revalidateTag("catalogo")` y subir `getCatalog` a `cacheLife("hours")`, WordPress en "disuadir a los motores de búsqueda". Un slug inexistente hoy responde 200 con `noindex`.
   - **Fase 3:** contenido propio por producto (título ≤ 60, meta ≤ 155, descripción propia, alt en fotos, 3 FAQ) y feed de Merchant Center con URLs `/p/`.
   - **Fase 4:** Core Web Vitals (CrUX) y analítica.
+- **Legal, antes de lanzar:** llenar `src/config/legal.ts` (los campos vacíos se ven como "[Por definir]" en `/terminos`), decidir qué pasa con el envío pagado si el cliente rechaza el pedido en la puerta, hacer que un abogado revise `/terminos` y revisar también `/privacidad` (Ley 1581). La autorización de datos hoy se da al confirmar el pedido (texto con enlace bajo el botón); el abogado debe decir si basta o si hace falta una casilla para marcar.
 - Anti-spam en el checkout (Cloudflare Turnstile) y límite de pedidos por IP en `/api/pedidos`.
 - **Pasarela de pagos para el envío.** Puntos de enganche: el paso 3 del checkout, el meta `_pwa_envio` en Woo y la nota "falta el pago del envío" en Mis pedidos. Ojo con el offline: el pedido se puede armar sin señal, pero el pago necesita red, así que el flujo debe ser guardar → sincronizar → pagar.
 - Definir las tarifas de envío por destino (llenar `src/config/envios.ts`, o reemplazar `costoEnvio()` si salen de Dropi o de una transportadora). Para tarifas por ciudad conviene un selector de municipios, porque hoy la ciudad se escribe a mano.

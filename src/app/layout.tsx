@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { Pwa } from "@/components/Pwa";
 import { SyncManager } from "@/components/SyncManager";
@@ -40,6 +41,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <SyncManager />
           <Header />
           <main className="mx-auto w-full max-w-6xl flex-1 px-4 pt-4 sm:pt-6">{children}</main>
+          <Footer />
         </Pwa>
       </body>
     </html>

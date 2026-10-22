@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { CashIcon, OfflineIcon, TruckIcon } from "@/components/Icons";
@@ -228,6 +229,17 @@ export default function CheckoutPage() {
             <span>{sending ? "Guardando…" : online ? "Confirmar pedido" : "Guardar pedido"}</span>
             <span className="font-display tabular-nums">{formatCOP(total + (envio ?? 0))}</span>
           </button>
+          <p className="text-center text-xs text-muted">
+            Al confirmar aceptas los{" "}
+            <Link href="/terminos" target="_blank" className="underline">
+              términos y condiciones
+            </Link>{" "}
+            y autorizas el tratamiento de tus datos según la{" "}
+            <Link href="/privacidad" target="_blank" className="underline">
+              política de datos
+            </Link>
+            .
+          </p>
         </aside>
       </div>
     </div>
