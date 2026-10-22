@@ -106,7 +106,7 @@ Estados (`OrderStatus` en `types.ts`): `pendiente` → `enviando` → `enviado`.
 
 ## Variables de entorno
 
-`NEXT_PUBLIC_SITE_URL` (opcional, el dominio propio cuando exista; alimenta `metadataBase`). `GOOGLE_SITE_VERIFICATION` (opcional, código de la etiqueta HTML de Search Console). `HERO_VARIANTE` (opcional: `clasico` por defecto o `pasos`; elige el bloque principal del inicio en `components/Hero.tsx`, se lee en el build). `WC_URL` (sin barra final), `WC_KEY` y `WC_SECRET` (llave REST de Woo con lectura y escritura, de un usuario dedicado). Ver `.env.example`. **Sin ellas, la app corre en modo demo** con `DEMO_PRODUCTS`, y `/api/pedidos` responde `demo: true` sin crear nada.
+`NEXT_PUBLIC_SITE_URL` (opcional, el dominio propio cuando exista; alimenta `metadataBase`). `GOOGLE_SITE_VERIFICATION` (opcional, código de la etiqueta HTML de Search Console). `HERO_VARIANTE` (opcional: `clasico` por defecto, `pasos`, `destacado` o `categorias`; elige el bloque principal del inicio en `components/Hero.tsx`, se lee en el build. `destacado` y `categorias` leen el catálogo y, sin datos, muestran el clásico). `WC_URL` (sin barra final), `WC_KEY` y `WC_SECRET` (llave REST de Woo con lectura y escritura, de un usuario dedicado). Ver `.env.example`. **Sin ellas, la app corre en modo demo** con `DEMO_PRODUCTS`, y `/api/pedidos` responde `demo: true` sin crear nada.
 
 ## Estado actual
 

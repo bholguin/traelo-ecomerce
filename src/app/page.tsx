@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { CatalogToolbar, DemoBanner } from "@/components/CatalogToolbar";
-import { Hero } from "@/components/Hero";
+import { Hero, HeroSkeleton } from "@/components/Hero";
 import { GridSkeleton, ProductGrid } from "@/components/ProductGrid";
 import { APP_NAME, APP_TAGLINE } from "@/lib/brand";
 import { getCatalog, getCategories } from "@/lib/catalogo";
@@ -23,7 +23,10 @@ export default function Home() {
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={jsonLd(ORGANIZATION)} />
-      <Hero />
+      {/* Las variantes "destacado" y "categorias" leen el catálogo */}
+      <Suspense fallback={<HeroSkeleton />}>
+        <Hero />
+      </Suspense>
       <div id="productos" className="scroll-mt-20">
         <Suspense fallback={<GridSkeleton />}>
           <HomeCatalog />

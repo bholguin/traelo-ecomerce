@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: PageProps<"/c/[slug]">): Prom
   if (!data) return { title: "Categoría no encontrada" };
   return {
     title: data.category.name,
-    description: `${data.category.name}: ${data.category.count} productos con pago contra entrega y envío a toda Colombia.`,
+    description: `${data.category.name}: ${data.category.count} productos. Pagas el producto al recibirlo y enviamos a toda Colombia.`,
   };
 }
 

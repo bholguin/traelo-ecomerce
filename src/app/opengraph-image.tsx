@@ -3,7 +3,7 @@ import { APP_NAME } from "@/lib/brand";
 
 // Imagen por defecto al compartir la tienda (WhatsApp, Facebook, X). Se genera en
 // el build. Las fichas tendrán la foto del producto (Fase 2 del plan SEO).
-export const alt = `${APP_NAME}: pago contra entrega en toda Colombia`;
+export const alt = `${APP_NAME}: producto contra entrega, envío a toda Colombia`;
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -48,7 +48,7 @@ export default function OpengraphImage() {
           <span style={{ color: "#c8ee3c" }}>Págalo en tu puerta.</span>
         </div>
         <div style={{ marginTop: 32, fontSize: 32, color: "rgba(251,249,245,0.75)" }}>
-          Pago contra entrega · Envío a toda Colombia
+          Producto contra entrega · Envío a toda Colombia
         </div>
       </div>
     ),
