@@ -2,7 +2,22 @@ import { Suspense } from "react";
 import { CatalogToolbar, DemoBanner } from "@/components/CatalogToolbar";
 import { CashIcon, OfflineIcon, TruckIcon } from "@/components/Icons";
 import { GridSkeleton, ProductGrid } from "@/components/ProductGrid";
+import { APP_NAME, APP_TAGLINE } from "@/lib/brand";
 import { getCatalog, getCategories } from "@/lib/catalogo";
+import { jsonLd } from "@/lib/seo";
+import { SITE_URL } from "@/lib/site";
+
+// Datos estructurados de la tienda (Google: nombre, logo y sitio en resultados).
+// Fase 2: agregar teléfono de WhatsApp (contactPoint) y redes (sameAs) cuando existan.
+const ORGANIZATION = {
+  "@context": "https://schema.org",
+  "@type": "OnlineStore",
+  name: APP_NAME,
+  url: SITE_URL,
+  logo: `${SITE_URL}/icon-512.png`,
+  description: APP_TAGLINE,
+  areaServed: { "@type": "Country", name: "Colombia" },
+};
 
 const PERKS = [
   { icon: CashIcon, label: "Pagas al recibir" },
@@ -13,6 +28,7 @@ const PERKS = [
 export default function Home() {
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={jsonLd(ORGANIZATION)} />
       <section className="relative isolate mb-6 overflow-hidden rounded-[2rem] bg-ink p-6 text-white sm:mb-8 sm:p-10">
         <div aria-hidden="true" className="hero-mesh absolute inset-0 -z-10" />
         <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold backdrop-blur">

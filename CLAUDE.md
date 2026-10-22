@@ -49,6 +49,7 @@ src/app/
   p/[slug]/page.tsx        ficha SSR (generateStaticParams con todos los productos)
   c/[slug]/page.tsx        categoría SSR
   buscar/page.tsx          búsqueda SSR (?q=), noindex
+  robots.ts  opengraph-image.tsx   robots (todo bloqueado si !indexable()) e imagen para compartir
   carrito/  checkout/  pedidos/   cliente, leen IndexedDB (se precachean)
   offline/                 respaldo del SW: según la URL pedida muestra ficha o catálogo desde IndexedDB
   producto/page.tsx        ficha offline heredada (/producto?id=), noindex
@@ -62,6 +63,7 @@ src/lib/
   catalogo.ts capa de datos del SSR: getCatalog (use cache + cacheTag "catalogo"), getProductBySlug, getCategories, searchProducts
   woo.ts      cliente WooCommerce, solo servidor ("server-only")
   site.ts     SITE_URL: NEXT_PUBLIC_SITE_URL → dominio de producción de Vercel → localhost
+  seo.ts      indexable() (solo producción con Woo) y jsonLd() para <script type="application/ld+json">
   hooks.ts    useOnline, useCart, useCartCount, usePendingCount, useCatalogMeta
   brand.ts    nombre de la tienda y color del tema (un solo lugar)
   types.ts  format.ts  colombia.ts (33 departamentos)  demo-products.ts
@@ -102,7 +104,7 @@ Estados (`OrderStatus` en `types.ts`): `pendiente` → `enviando` → `enviado`.
 
 ## Variables de entorno
 
-`NEXT_PUBLIC_SITE_URL` (opcional, el dominio propio cuando exista; alimenta `metadataBase`). `WC_URL` (sin barra final), `WC_KEY` y `WC_SECRET` (llave REST de Woo con lectura y escritura, de un usuario dedicado). Ver `.env.example`. **Sin ellas, la app corre en modo demo** con `DEMO_PRODUCTS`, y `/api/pedidos` responde `demo: true` sin crear nada.
+`NEXT_PUBLIC_SITE_URL` (opcional, el dominio propio cuando exista; alimenta `metadataBase`). `GOOGLE_SITE_VERIFICATION` (opcional, código de la etiqueta HTML de Search Console). `WC_URL` (sin barra final), `WC_KEY` y `WC_SECRET` (llave REST de Woo con lectura y escritura, de un usuario dedicado). Ver `.env.example`. **Sin ellas, la app corre en modo demo** con `DEMO_PRODUCTS`, y `/api/pedidos` responde `demo: true` sin crear nada.
 
 ## Estado actual
 
@@ -115,13 +117,13 @@ Estados (`OrderStatus` en `types.ts`): `pendiente` → `enviando` → `enviado`.
 ## Pendiente / próximos trabajos
 
 - Plan SEO, siguientes fases:
-  - **Fase 1:** `robots.ts` (bloquear `/api/`, `/carrito`, `/checkout`, `/pedidos`), `noindex` en modo demo, Open Graph por defecto, JSON-LD `Organization` en el inicio, Search Console.
+  - ✅ **Fase 1:** `robots.ts`, `noindex` en modo demo y vistas previas (`indexable()`), páginas privadas con `noindex`, Open Graph e imagen por defecto, JSON-LD `OnlineStore` en el inicio, verificación de Search Console por variable. Falta lo manual: dar de alta la propiedad en Search Console cuando haya dominio. La rama "indexable" (producción con Woo) no se ha probado: no hay Woo todavía.
   - **Fase 2** (con Woo): `generateMetadata` completo (canonical, OG con foto), JSON-LD `Product` + `Offer` y `BreadcrumbList`, `sitemap.ts`, webhook de Woo → `revalidateTag("catalogo")` y subir `getCatalog` a `cacheLife("hours")`, WordPress en "disuadir a los motores de búsqueda". Un slug inexistente hoy responde 200 con `noindex`.
   - **Fase 3:** contenido propio por producto (título ≤ 60, meta ≤ 155, descripción propia, alt en fotos, 3 FAQ) y feed de Merchant Center con URLs `/p/`.
   - **Fase 4:** Core Web Vitals (CrUX) y analítica.
 - Anti-spam en el checkout (Cloudflare Turnstile) y límite de pedidos por IP en `/api/pedidos`.
 - Costo de envío: hoy solo se muestra el total de productos ("se confirma al despachar").
-- Marca: el nombre "Tráelo" (`src/lib/brand.ts`) es provisional, y los íconos de `public/` todavía son los genéricos. Colores en `oklch` en `globals.css`; los botones principales van en `ink` porque el texto blanco sobre `brand` no da contraste AA.
+- Marca: el nombre "Tráelo" (`src/lib/brand.ts`) es provisional. Los íconos (`public/icon-*.png`, `src/app/apple-icon.png`, `src/app/favicon.ico`) se generaron del logo del encabezado: degradado `brand` → `brand-2`, radio de 1/3 del lado y "t" blanca a la mitad del alto. El maskable y el de iPhone van a sangre, sin esquinas, porque el sistema recorta su propia forma. Colores en `oklch` en `globals.css`; los botones principales van en `ink` porque el texto blanco sobre `brand` no da contraste AA.
 - Diseño: la foto viaja del catálogo a la ficha con `<ViewTransition name="producto-{id}" share="morph">`, que solo forma pareja si la ficha llega en el mismo commit que la navegación (fichas prerenderizadas y prefetcheadas). Las tarjetas aparecen con scroll-driven animations (`.reveal`), sin respaldo porque es decorativo. En `.text-gradient` usa `background-image`, no el atajo `background`.
 - Índice de idempotencia más robusto que "últimos 50 pedidos".
 - Pruebas automatizadas en el repo (la prueba E2E se corrió con Playwright fuera del proyecto).

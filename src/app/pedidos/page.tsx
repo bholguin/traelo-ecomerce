@@ -1,7 +1,8 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { Orders } from "@/components/Orders";
 
-export const metadata = { title: "Mis pedidos" };
+export const metadata: Metadata = { title: "Mis pedidos", robots: { index: false, follow: false } };
 
 export default function PedidosPage() {
   return (
