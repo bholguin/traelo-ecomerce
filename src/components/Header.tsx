@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { BagIcon, OfflineIcon, PackageIcon, StoreIcon } from "@/components/Icons";
+import { APP_NAME } from "@/lib/brand";
 import { useCartCount, useOnline, usePendingCount } from "@/lib/hooks";
+
+// En la ficha y en el checkout la barra inferior se esconde: esas páginas
+// tienen su propio botón fijo abajo.
+const HIDE_DOCK = ["/producto", "/checkout"];
 
 export function Header() {
   const online = useOnline();
@@ -11,93 +17,114 @@ export function Header() {
   const path = usePathname();
 
   const nav = [
-    { href: "/", label: "Tienda" },
-    { href: "/pedidos", label: "Mis pedidos", badge: pending },
+    { href: "/", label: "Tienda", icon: StoreIcon, badge: 0 },
+    { href: "/pedidos", label: "Pedidos", icon: PackageIcon, badge: pending },
+    { href: "/carrito", label: "Carrito", icon: BagIcon, badge: cartCount },
   ];
 
   return (
     <>
-      <header className="sticky top-0 z-20 border-b border-line bg-surface/90 backdrop-blur">
-        {!online && (
-          <div className="bg-ink px-4 py-1.5 text-center text-xs font-medium text-surface">
-            Sin conexión · puedes seguir comprando, tu pedido se enviará al
-            volver la señal
-          </div>
-        )}
-        <div className="mx-auto flex h-14 max-w-6xl items-center gap-4 px-4">
-          <Link href="/" className="text-lg font-bold tracking-tight">
-            Tienda<span className="text-brand">.</span>
+      <header className="sticky top-0 z-30 border-b border-line/70 bg-surface/75 backdrop-blur-xl backdrop-saturate-150">
+        <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4">
+          <Link href="/" className="flex items-center gap-2" aria-label={`${APP_NAME}, inicio`}>
+            <span className="grid size-9 place-items-center rounded-xl bg-linear-to-br from-brand to-brand-2 font-display text-lg font-black text-white shadow-md shadow-brand/30">
+              {APP_NAME[0].toLowerCase()}
+            </span>
+            <span className="font-display text-xl font-extrabold tracking-tight">{APP_NAME.toLowerCase()}</span>
           </Link>
 
-          <nav className="ml-2 hidden gap-1 sm:flex">
-            {nav.map((n) => (
+          <nav className="ml-4 hidden gap-1 sm:flex" aria-label="Principal">
+            {nav.slice(0, 2).map((n) => (
               <Link
                 key={n.href}
                 href={n.href}
-                className={`relative rounded-full px-3 py-1.5 text-sm ${
-                  path === n.href
-                    ? "bg-soft font-semibold"
-                    : "text-muted hover:text-ink"
-                }`}
+                aria-current={path === n.href ? "page" : undefined}
+                className="relative rounded-full px-3.5 py-2 text-sm font-medium text-muted transition-colors hover:text-ink aria-[current=page]:bg-ink aria-[current=page]:text-surface"
               >
                 {n.label}
-                {!!n.badge && (
-                  <span className="ml-1.5 rounded-full bg-warn px-1.5 text-xs font-semibold text-ink">
-                    {n.badge}
-                  </span>
+                {n.badge > 0 && (
+                  <span className="ml-1.5 rounded-full bg-warn px-1.5 text-xs font-bold text-ink">{n.badge}</span>
                 )}
               </Link>
             ))}
           </nav>
 
-          <div className="ml-auto flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-2">
             <span
-              className={`flex items-center gap-1.5 text-xs ${online ? "text-muted" : "font-semibold text-ink"}`}
               aria-live="polite"
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${
+                online ? "text-muted" : "bg-ink text-surface"
+              }`}
             >
-              <span
-                className={`h-2 w-2 rounded-full ${online ? "bg-ok" : "bg-warn"}`}
-              />
-              {online ? "En línea" : "Offline"}
+              {online ? (
+                <span className="relative flex size-2">
+                  <span className="absolute inline-flex size-full rounded-full bg-ok opacity-60 motion-safe:animate-ping" />
+                  <span className="relative inline-flex size-2 rounded-full bg-ok" />
+                </span>
+              ) : (
+                <OfflineIcon width={14} height={14} />
+              )}
+              <span className={online ? "hidden sm:inline" : ""}>{online ? "En línea" : "Sin señal"}</span>
             </span>
+
             <Link
               href="/carrito"
-              className="relative flex h-10 items-center gap-2 rounded-full bg-ink px-4 text-sm font-semibold text-surface"
+              className="hidden h-11 items-center gap-2 rounded-full bg-ink px-4 text-sm font-semibold text-surface transition-transform active:scale-95 sm:flex"
             >
+              <BagIcon width={18} height={18} />
               Carrito
               {cartCount > 0 && (
-                <span className="rounded-full bg-brand px-1.5 text-xs text-white">
+                <span key={cartCount} className="animate-bump rounded-full bg-lime px-1.5 text-xs font-bold text-ink">
                   {cartCount}
                 </span>
               )}
             </Link>
           </div>
         </div>
+
+        {!online && (
+          <p className="border-t border-line/70 bg-soft px-4 py-2 text-center text-xs text-ink">
+            Puedes seguir comprando: tu pedido se guarda en el celular y sale solo cuando vuelva la señal.
+          </p>
+        )}
       </header>
 
-      {/* Navegación inferior en celular: fuera del header, porque backdrop-blur
-          convierte al header en el contenedor de los elementos fixed */}
-      <nav
-        className="fixed inset-x-0 bottom-0 z-20 flex border-t border-line bg-surface sm:hidden"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-      >
-        {nav.map((n) => (
-          <Link
-            key={n.href}
-            href={n.href}
-            className={`flex flex-1 items-center justify-center gap-1.5 py-3 text-sm ${
-              path === n.href ? "font-semibold text-ink" : "text-muted"
-            }`}
-          >
-            {n.label}
-            {!!n.badge && (
-              <span className="rounded-full bg-warn px-1.5 text-xs font-semibold text-ink">
-                {n.badge}
-              </span>
-            )}
-          </Link>
-        ))}
-      </nav>
+      {/* Barra flotante en celular. Va fuera del header: backdrop-blur convierte
+          al header en el contenedor de los elementos fixed. */}
+      {!HIDE_DOCK.includes(path) && (
+        <nav
+          aria-label="Principal"
+          className="fixed inset-x-4 z-30 mx-auto flex max-w-sm gap-1 rounded-full border border-line/70 bg-card/85 p-1.5 shadow-xl shadow-ink/10 backdrop-blur-xl sm:hidden"
+          style={{ bottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }}
+        >
+          {nav.map((n) => {
+            const active = path === n.href;
+            return (
+              <Link
+                key={n.href}
+                href={n.href}
+                aria-current={active ? "page" : undefined}
+                className={`relative flex h-12 flex-1 items-center justify-center gap-1.5 rounded-full text-sm font-semibold transition-colors ${
+                  active ? "bg-ink text-surface" : "text-muted"
+                }`}
+              >
+                <n.icon width={20} height={20} />
+                <span className={active ? "" : "sr-only"}>{n.label}</span>
+                {n.badge > 0 && (
+                  <span
+                    key={n.badge}
+                    className={`absolute top-1 right-[calc(50%-1.4rem)] min-w-5 animate-bump rounded-full px-1 text-center text-[11px] leading-5 font-bold ${
+                      n.href === "/pedidos" ? "bg-warn text-ink" : "bg-lime text-ink"
+                    } ${active ? "hidden" : ""}`}
+                  >
+                    {n.badge}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
+        </nav>
+      )}
     </>
   );
 }

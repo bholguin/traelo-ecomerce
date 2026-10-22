@@ -1,16 +1,28 @@
 @import "tailwindcss";
 
 @theme {
-  --color-brand: #e4572e;
-  --color-ink: #1d1b19;
-  --color-muted: #6f6a64;
-  --color-surface: #fffdf9;
-  --color-soft: #f3eee7;
-  --color-line: #e7e0d6;
-  --color-ok: #2f9e62;
-  --color-warn: #f2b33d;
-  --color-bad: #c8372d;
+  --color-brand: oklch(0.66 0.21 38);
+  --color-brand-2: oklch(0.6 0.24 12);
+  --color-lime: oklch(0.91 0.2 122);
+  --color-ink: oklch(0.2 0.02 50);
+  --color-muted: oklch(0.5 0.02 60);
+  --color-surface: oklch(0.985 0.006 80);
+  --color-card: oklch(1 0 0);
+  --color-soft: oklch(0.955 0.012 75);
+  --color-line: oklch(0.91 0.012 75);
+  --color-ok: oklch(0.58 0.14 152);
+  --color-warn: oklch(0.8 0.15 80);
+  --color-bad: oklch(0.55 0.2 27);
+  /* Solo fuentes del sistema: funcionan sin conexión. */
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --animate-bump: bump 350ms ease-out;
+}
+
+@keyframes bump {
+  40% {
+    scale: 1.35;
+  }
 }
 
 html {
@@ -22,13 +34,13 @@ body {
   color: var(--color-ink);
 }
 
-/* Espacio para la barra inferior en celular y el área segura del iPhone */
+/* Espacio para la barra flotante inferior en celular y el área segura del iPhone */
 main {
-  padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+  padding-bottom: calc(6.5rem + env(safe-area-inset-bottom));
 }
 @media (min-width: 640px) {
   main {
-    padding-bottom: 3rem;
+    padding-bottom: 4rem;
   }
 }
 
@@ -36,4 +48,65 @@ input,
 select,
 textarea {
   font-size: 16px; /* evita el zoom automático en iOS */
+}
+
+/* Fondo del hero: manchas de color difuminadas sobre tinta */
+.hero-mesh {
+  background:
+    radial-gradient(40% 60% at 85% 10%, oklch(0.66 0.21 38 / 0.85), transparent 70%),
+    radial-gradient(35% 55% at 100% 90%, oklch(0.6 0.24 12 / 0.7), transparent 70%),
+    radial-gradient(30% 40% at 60% 110%, oklch(0.91 0.2 122 / 0.35), transparent 70%);
+  filter: blur(8px);
+}
+
+/* background-image y no el atajo background: el compilador duplica la regla para
+   navegadores con lab() y el atajo reiniciaría background-clip. */
+.text-gradient {
+  background-image: linear-gradient(90deg, var(--color-lime), oklch(0.85 0.16 70), var(--color-brand));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+/* Las tarjetas aparecen al entrar en pantalla. Decorativo: sin soporte, se ven normales. */
+@keyframes reveal {
+  from {
+    opacity: 0;
+    translate: 0 1.5rem;
+    scale: 0.96;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  @supports ((animation-timeline: view()) and (animation-range: entry)) {
+    .reveal {
+      animation: reveal auto linear backwards;
+      animation-timeline: view();
+      animation-range: entry 0% entry 70%;
+    }
+  }
+}
+
+/* Foto del producto que viaja del catálogo a la ficha (<ViewTransition share="morph">) */
+::view-transition-group(.morph) {
+  animation-duration: 420ms;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+::view-transition-image-pair(.morph) {
+  animation-name: via-blur;
+}
+@keyframes via-blur {
+  30% {
+    filter: blur(3px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
 }

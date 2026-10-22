@@ -54,9 +54,12 @@ src/lib/
   sync.ts     refreshCatalog(), enqueueOrder(), flushQueue(), retryOrder()
   woo.ts      cliente WooCommerce, solo servidor ("server-only")
   hooks.ts    useOnline, useCart, useCartCount, usePendingCount, useCatalogMeta
+  brand.ts    nombre de la tienda y color del tema (un solo lugar)
+  product-cache.ts  producto tocado en el catálogo, para que la ficha pinte en el primer render
   types.ts  format.ts  colombia.ts (33 departamentos)  demo-products.ts
 src/components/
-  Header, SyncManager, Pwa (SerwistProvider), Catalog, ProductDetail, Orders, ProductImage
+  Header (barra superior + barra flotante en celular), SyncManager, Pwa (SerwistProvider),
+  Catalog, ProductDetail, Orders (línea de tiempo), ProductImage, Icons (SVG propios, sin dependencias)
 ```
 
 ## Reglas del modo offline (importantes)
@@ -100,7 +103,8 @@ Estados (`OrderStatus` en `types.ts`): `pendiente` → `enviando` → `enviado`.
 
 - Anti-spam en el checkout (Cloudflare Turnstile) y límite de pedidos por IP en `/api/pedidos`.
 - Costo de envío: hoy solo se muestra el total de productos ("se confirma al despachar").
-- Marca: el nombre "Tienda", los colores (`--color-brand: #e4572e`) y los íconos de `public/` son provisionales.
+- Marca: el nombre "Tráelo" (`src/lib/brand.ts`) es provisional, y los íconos de `public/` todavía son los genéricos. Colores en `oklch` en `globals.css`; los botones principales van en `ink` porque el texto blanco sobre `brand` no da contraste AA.
+- Diseño: la foto viaja del catálogo a la ficha con `<ViewTransition name="producto-{id}" share="morph">`, que solo funciona si la ficha la pinta en el primer render (de ahí `productCache`). Las tarjetas aparecen con scroll-driven animations (`.reveal`), sin respaldo porque es decorativo. En `.text-gradient` usa `background-image`, no el atajo `background`.
 - Índice de idempotencia más robusto que "últimos 50 pedidos".
 - Pruebas automatizadas en el repo (la prueba E2E se corrió con Playwright fuera del proyecto).
 

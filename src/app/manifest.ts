@@ -1,17 +1,18 @@
 import type { MetadataRoute } from "next";
+import { APP_NAME, APP_TAGLINE, THEME_COLOR } from "@/lib/brand";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Tienda · contra entrega",
-    short_name: "Tienda",
-    description: "Compra contra entrega en toda Colombia, incluso sin conexión.",
+    name: `${APP_NAME} · contra entrega`,
+    short_name: APP_NAME,
+    description: APP_TAGLINE,
     lang: "es-CO",
     start_url: "/",
     scope: "/",
     display: "standalone",
     orientation: "portrait",
-    background_color: "#fffdf9",
-    theme_color: "#fffdf9",
+    background_color: THEME_COLOR,
+    theme_color: THEME_COLOR,
     icons: [
       { src: "/icon-192.png", sizes: "192x192", type: "image/png" },
       { src: "/icon-512.png", sizes: "512x512", type: "image/png" },

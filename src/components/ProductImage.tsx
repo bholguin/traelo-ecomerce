@@ -2,8 +2,6 @@
 // <img> normal a propósito: next/image optimiza en el servidor y esa URL
 // no estaría disponible sin conexión. El service worker cachea las fotos.
 
-const TONES = ["#F4D9C6", "#D6E4D3", "#D9DDF0", "#F1E3B8", "#E7D3E6", "#CFE5E8"];
-
 export function ProductImage({
   src,
   name,
@@ -18,6 +16,8 @@ export function ProductImage({
   if (src) {
     return <img src={src} alt={name} loading="lazy" className={`h-full w-full object-cover ${className}`} />;
   }
+  // Sin foto: degradado con un tono estable por producto y sus iniciales.
+  const hue = (id * 47) % 360;
   const initials = name
     .split(" ")
     .slice(0, 2)
@@ -26,8 +26,10 @@ export function ProductImage({
     .toUpperCase();
   return (
     <div
-      className={`flex h-full w-full items-center justify-center text-3xl font-bold text-ink/40 ${className}`}
-      style={{ background: TONES[id % TONES.length] }}
+      className={`flex h-full w-full items-center justify-center font-display text-4xl font-black text-ink/30 ${className}`}
+      style={{
+        background: `radial-gradient(circle at 30% 20%, oklch(0.95 0.06 ${hue}), oklch(0.86 0.09 ${(hue + 40) % 360}))`,
+      }}
       aria-label={name}
       role="img"
     >
