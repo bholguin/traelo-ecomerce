@@ -39,7 +39,7 @@ export default function CarritoPage() {
           {cart.map((item) => (
             <li key={item.productId} className="flex gap-3 rounded-3xl border border-line bg-card p-3">
               <Link
-                href={`/producto?id=${item.productId}`}
+                href={item.slug ? `/p/${item.slug}` : `/producto?id=${item.productId}`}
                 className="size-24 shrink-0 overflow-hidden rounded-2xl bg-soft"
                 tabIndex={-1}
                 aria-hidden="true"

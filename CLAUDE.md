@@ -4,7 +4,9 @@ Lee también `AGENTS.md`: esta es Next.js 16.4 y sus APIs difieren de versiones 
 
 ## Qué es
 
-Una PWA responsive para Colombia. Vende productos del catálogo de **Dropi** (dropshipping colombiano) con **pago contra entrega**. Su requisito central es **funcionar sin conexión**: el cliente navega el catálogo, arma el carrito y confirma el pedido sin señal, y el pedido se envía solo cuando vuelve la red.
+Una PWA responsive para Colombia. Vende productos del catálogo de **Dropi** (dropshipping colombiano) con **pago contra entrega**. Tiene dos requisitos centrales:
+- **SSR primero, por SEO:** todo lo público (inicio, categorías, fichas) se renderiza en el servidor con datos de Woo, para que Google lo indexe.
+- **Funcionar sin conexión:** el cliente arma el carrito y confirma el pedido sin señal, y el pedido se envía solo cuando vuelve la red. El offline es una capa encima del SSR, no la base.
 
 Idioma de la interfaz y de los textos: español de Colombia. Moneda: COP sin decimales.
 
@@ -15,7 +17,7 @@ Celular (PWA Next.js) ──pedidos──▶ /api/pedidos (Vercel) ──REST v3
                       ◀─catálogo── /api/catalogo (Vercel) ◀─Store API─┘
 ```
 
-- **Frontend + API:** Next.js 16 (App Router, Turbopack, `cacheComponents: true`), desplegado en **Vercel**.
+- **Frontend + API:** Next.js 16 (App Router, Turbopack, `cacheComponents` + `partialPrefetching`), desplegado en **Vercel**. Las páginas públicas son server components que leen de `src/lib/catalogo.ts` (caché con `use cache`); solo lo interactivo y lo del dispositivo (carrito, checkout, mis pedidos) es cliente.
 - **Backend invisible:** WordPress + WooCommerce en modo headless, en un hosting PHP aparte. Sirve de catálogo y de panel de pedidos.
 - **Integración con Dropi:** el plugin oficial de WordPress `wc-dropi-integration` ("Dropify"). Importa los productos de Dropi a Woo y crea en Dropi cada pedido de Woo. Se configura con el access token que da Dropi en *Mis tiendas*. **No llamamos a Dropi directamente**: su API no tiene documentación pública.
 
@@ -24,6 +26,7 @@ Celular (PWA Next.js) ──pedidos──▶ /api/pedidos (Vercel) ──REST v3
 | Decisión | Motivo |
 | --- | --- |
 | PWA, no app nativa | Un solo código; se instala desde el navegador |
+| **SSR primero** (desde la Fase 0 del plan SEO) | Elección del usuario: usar Next por su SSR y posicionar los productos en Google. El offline se mantiene como mejora progresiva |
 | Next.js + Vercel | Elección del usuario; los route handlers reemplazan a un mini-plugin de WordPress |
 | WooCommerce como intermediario con Dropi | La integración la resuelve el plugin oficial; evita depender de una API no documentada |
 | Solo pago contra entrega | Es el modelo nativo de Dropi; no hay pagos en línea en el MVP |
@@ -42,30 +45,38 @@ Celular (PWA Next.js) ──pedidos──▶ /api/pedidos (Vercel) ──REST v3
 
 ```
 src/app/
-  page.tsx                 catálogo (búsqueda + categorías)
-  producto/page.tsx        ficha: UNA ruta /producto?id=123 que lee de IndexedDB
-  carrito/  checkout/  pedidos/  offline/
-  api/catalogo/route.ts    Store API de Woo → JSON; modo demo sin variables
+  page.tsx                 inicio SSR: hero + catálogo
+  p/[slug]/page.tsx        ficha SSR (generateStaticParams con todos los productos)
+  c/[slug]/page.tsx        categoría SSR
+  buscar/page.tsx          búsqueda SSR (?q=), noindex
+  carrito/  checkout/  pedidos/   cliente, leen IndexedDB (se precachean)
+  offline/                 respaldo del SW: según la URL pedida muestra ficha o catálogo desde IndexedDB
+  producto/page.tsx        ficha offline heredada (/producto?id=), noindex
+  api/catalogo/route.ts    catálogo completo para IndexedDB (comparte caché con el SSR)
   api/pedidos/route.ts     valida, recalcula precio/stock, deduplica y crea el pedido en Woo
   sw.ts                    service worker (Serwist)
   manifest.ts              manifest PWA
 src/lib/
   db.ts       Dexie: tablas products, cart, orders, meta
   sync.ts     refreshCatalog(), enqueueOrder(), flushQueue(), retryOrder()
+  catalogo.ts capa de datos del SSR: getCatalog (use cache + cacheTag "catalogo"), getProductBySlug, getCategories, searchProducts
   woo.ts      cliente WooCommerce, solo servidor ("server-only")
+  site.ts     SITE_URL: NEXT_PUBLIC_SITE_URL → dominio de producción de Vercel → localhost
   hooks.ts    useOnline, useCart, useCartCount, usePendingCount, useCatalogMeta
   brand.ts    nombre de la tienda y color del tema (un solo lugar)
-  product-cache.ts  producto tocado en el catálogo, para que la ficha pinte en el primer render
   types.ts  format.ts  colombia.ts (33 departamentos)  demo-products.ts
 src/components/
   Header (barra superior + barra flotante en celular), SyncManager, Pwa (SerwistProvider),
-  Catalog, ProductDetail, Orders (línea de tiempo), ProductImage, Icons (SVG propios, sin dependencias)
+  ProductView (ficha compartida SSR/offline) + ProductIslands (Gallery, AddToCart, FocusHeading),
+  ProductCard + QuickAdd, ProductGrid, CatalogToolbar, OfflineCatalog, ProductDetail (ficha desde IndexedDB),
+  Orders (línea de tiempo), ProductImage, Icons (SVG propios, sin dependencias)
 ```
 
 ## Reglas del modo offline (importantes)
 
-1. **Toda página debe poder prerenderizarse como estática.** Las páginas son client components que leen de IndexedDB. No hagas render en servidor por producto ni `generateStaticParams` por producto: esas páginas no abrirían sin red.
-2. **La ficha de producto es `/producto?id=`.** El service worker ignora los parámetros `id` y `nuevo` (`ignoreURLParametersMatching` en `sw.ts`) para servir la página precacheada.
+1. **Las páginas SSR con datos no van al precache** (`globIgnores` en `serwist.config.mjs`): el precache responde desde caché antes que la red y mostraría precios del build. Se guardan al visitarlas (regla `paginas` en `sw.ts`: red primero, 4 s de espera, 80 páginas, 7 días). Si agregas una página pública con datos, agrégala a `globIgnores`.
+2. **Una página nunca visitada, sin señal, cae en `/offline`.** La URL del navegador sigue siendo la pedida, y `OfflineFallback` usa `usePathname()` para mostrar la ficha (`/p/slug`) o el catálogo (`/c/slug`, resto) desde IndexedDB. Por eso `SyncManager` sigue descargando el catálogo completo.
+   - La ficha usa `ProductView` sin `"use client"`, para que la misma interfaz sirva en el SSR y en el offline. No le agregues hooks: lo interactivo va en `ProductIslands`.
 3. **`useSearchParams` va dentro de `<Suspense>`** (lo exige `cacheComponents`).
 4. **El pedido se guarda en IndexedDB antes de enviarse.** Nunca envíes un pedido sin guardarlo primero.
 5. **`reloadOnOnline={false}`** en `SerwistProvider`. El valor por defecto (`true`) recarga la página al volver la red y borraba el checkout a medio llenar.
@@ -91,21 +102,27 @@ Estados (`OrderStatus` en `types.ts`): `pendiente` → `enviando` → `enviado`.
 
 ## Variables de entorno
 
-`WC_URL` (sin barra final), `WC_KEY` y `WC_SECRET` (llave REST de Woo con lectura y escritura, de un usuario dedicado). Ver `.env.example`. **Sin ellas, la app corre en modo demo** con `DEMO_PRODUCTS`, y `/api/pedidos` responde `demo: true` sin crear nada.
+`NEXT_PUBLIC_SITE_URL` (opcional, el dominio propio cuando exista; alimenta `metadataBase`). `WC_URL` (sin barra final), `WC_KEY` y `WC_SECRET` (llave REST de Woo con lectura y escritura, de un usuario dedicado). Ver `.env.example`. **Sin ellas, la app corre en modo demo** con `DEMO_PRODUCTS`, y `/api/pedidos` responde `demo: true` sin crear nada.
 
 ## Estado actual
 
 - ✅ Fases 2 y 3: PWA base y capa offline. Probado en Chromium a 390 px: catálogo offline, ficha offline, carrito, checkout offline, pedido en cola que se sincroniza al volver la red, sin errores de JavaScript.
 - ✅ Route handlers de catálogo y pedidos, con modo demo.
+- ✅ Fase 0 del plan SEO (SSR primero), en la rama `feat/ssr-primero`. El HTML del servidor trae productos, títulos por ficha y categoría. Prueba E2E offline OK: ficha visitada, ficha y categoría no visitadas (respaldo desde IndexedDB), pedido sin señal que sale al volver la red.
 - ⏳ **Fase 0 (bloqueante antes de lanzar):** confirmar que el plugin de Dropi crea el pedido en Dropi cuando el pedido de Woo **llega por la REST API**. No está verificado; muchos plugins solo escuchan el checkout normal. El plan B está en el README.
 - ⏳ Montar WordPress + WooCommerce + plugin Dropify, importar productos y configurar las variables en Vercel.
 
 ## Pendiente / próximos trabajos
 
+- Plan SEO, siguientes fases:
+  - **Fase 1:** `robots.ts` (bloquear `/api/`, `/carrito`, `/checkout`, `/pedidos`), `noindex` en modo demo, Open Graph por defecto, JSON-LD `Organization` en el inicio, Search Console.
+  - **Fase 2** (con Woo): `generateMetadata` completo (canonical, OG con foto), JSON-LD `Product` + `Offer` y `BreadcrumbList`, `sitemap.ts`, webhook de Woo → `revalidateTag("catalogo")` y subir `getCatalog` a `cacheLife("hours")`, WordPress en "disuadir a los motores de búsqueda". Un slug inexistente hoy responde 200 con `noindex`.
+  - **Fase 3:** contenido propio por producto (título ≤ 60, meta ≤ 155, descripción propia, alt en fotos, 3 FAQ) y feed de Merchant Center con URLs `/p/`.
+  - **Fase 4:** Core Web Vitals (CrUX) y analítica.
 - Anti-spam en el checkout (Cloudflare Turnstile) y límite de pedidos por IP en `/api/pedidos`.
 - Costo de envío: hoy solo se muestra el total de productos ("se confirma al despachar").
 - Marca: el nombre "Tráelo" (`src/lib/brand.ts`) es provisional, y los íconos de `public/` todavía son los genéricos. Colores en `oklch` en `globals.css`; los botones principales van en `ink` porque el texto blanco sobre `brand` no da contraste AA.
-- Diseño: la foto viaja del catálogo a la ficha con `<ViewTransition name="producto-{id}" share="morph">`, que solo funciona si la ficha la pinta en el primer render (de ahí `productCache`). Las tarjetas aparecen con scroll-driven animations (`.reveal`), sin respaldo porque es decorativo. En `.text-gradient` usa `background-image`, no el atajo `background`.
+- Diseño: la foto viaja del catálogo a la ficha con `<ViewTransition name="producto-{id}" share="morph">`, que solo forma pareja si la ficha llega en el mismo commit que la navegación (fichas prerenderizadas y prefetcheadas). Las tarjetas aparecen con scroll-driven animations (`.reveal`), sin respaldo porque es decorativo. En `.text-gradient` usa `background-image`, no el atajo `background`.
 - Índice de idempotencia más robusto que "últimos 50 pedidos".
 - Pruebas automatizadas en el repo (la prueba E2E se corrió con Playwright fuera del proyecto).
 

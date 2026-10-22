@@ -31,6 +31,7 @@ export async function addToCart(p: Product, quantity = 1) {
     const current = await db.cart.get(p.id);
     await db.cart.put({
       productId: p.id,
+      slug: p.slug,
       name: p.name,
       price: p.price,
       image: p.images[0],

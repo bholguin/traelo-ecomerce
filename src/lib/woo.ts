@@ -15,6 +15,7 @@ export const wooConfigured = () => Boolean(WC_URL && WC_KEY && WC_SECRET);
 
 type StoreProduct = {
   id: number;
+  slug: string;
   name: string;
   short_description: string;
   description: string;
@@ -39,6 +40,7 @@ function mapStoreProduct(p: StoreProduct): Product {
   const regular = Math.round(Number(p.prices.regular_price) / unit);
   return {
     id: p.id,
+    slug: p.slug,
     name: stripHtml(p.name),
     description: stripHtml(p.short_description || p.description).slice(0, 600),
     price,

@@ -7,14 +7,24 @@ export function ProductImage({
   name,
   id,
   className = "",
+  priority = false,
 }: {
   src?: string;
   name: string;
   id: number;
   className?: string;
+  priority?: boolean; // foto principal de la ficha (LCP): sin lazy y con prioridad alta
 }) {
   if (src) {
-    return <img src={src} alt={name} loading="lazy" className={`h-full w-full object-cover ${className}`} />;
+    return (
+      <img
+        src={src}
+        alt={name}
+        loading={priority ? "eager" : "lazy"}
+        fetchPriority={priority ? "high" : "auto"}
+        className={`h-full w-full object-cover ${className}`}
+      />
+    );
   }
   // Sin foto: degradado con un tono estable por producto y sus iniciales.
   const hue = (id * 47) % 360;

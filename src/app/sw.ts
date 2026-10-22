@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 import { defaultCache } from "@serwist/next/worker";
 import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
-import { CacheFirst, ExpirationPlugin, NetworkOnly, Serwist } from "serwist";
+import { CacheFirst, ExpirationPlugin, NetworkFirst, NetworkOnly, Serwist } from "serwist";
 
 declare global {
   interface WorkerGlobalScope extends SerwistGlobalConfig {
@@ -23,6 +23,17 @@ const serwist = new Serwist({
   runtimeCaching: [
     // La API nunca se cachea en el SW: la PWA guarda sus datos en IndexedDB.
     { matcher: ({ url }) => url.pathname.startsWith("/api/"), handler: new NetworkOnly() },
+    // Páginas SSR visitadas (inicio, fichas, categorías): red primero para precios y
+    // stock al día; con señal débil (más de 4 s) o sin señal, la copia guardada.
+    // Una página nunca visitada cae en el respaldo /offline, que lee de IndexedDB.
+    {
+      matcher: ({ request, sameOrigin }) => sameOrigin && request.mode === "navigate",
+      handler: new NetworkFirst({
+        cacheName: "paginas",
+        networkTimeoutSeconds: 4,
+        plugins: [new ExpirationPlugin({ maxEntries: 80, maxAgeSeconds: 7 * 24 * 60 * 60 })],
+      }),
+    },
     // Fotos de productos (vienen del dominio de WordPress/Dropi)
     {
       matcher: ({ request, sameOrigin }) => request.destination === "image" && !sameOrigin,

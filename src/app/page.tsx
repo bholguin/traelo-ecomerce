@@ -1,5 +1,8 @@
-import { Catalog } from "@/components/Catalog";
+import { Suspense } from "react";
+import { CatalogToolbar, DemoBanner } from "@/components/CatalogToolbar";
 import { CashIcon, OfflineIcon, TruckIcon } from "@/components/Icons";
+import { GridSkeleton, ProductGrid } from "@/components/ProductGrid";
+import { getCatalog, getCategories } from "@/lib/catalogo";
 
 const PERKS = [
   { icon: CashIcon, label: "Pagas al recibir" },
@@ -36,7 +39,20 @@ export default function Home() {
           ))}
         </ul>
       </section>
-      <Catalog />
+      <Suspense fallback={<GridSkeleton />}>
+        <HomeCatalog />
+      </Suspense>
+    </>
+  );
+}
+
+async function HomeCatalog() {
+  const [{ products, demo }, categories] = await Promise.all([getCatalog(), getCategories()]);
+  return (
+    <>
+      {demo && <DemoBanner />}
+      <CatalogToolbar categories={categories} />
+      <ProductGrid products={products} empty="Todavía no hay productos publicados." />
     </>
   );
 }

@@ -1,8 +1,9 @@
+import { slugify } from "./format";
 import type { Product } from "./types";
 
 // Catálogo de prueba. Se usa solo cuando WC_URL no está configurado,
 // para poder desarrollar la PWA antes de tener WooCommerce + Dropi conectados.
-export const DEMO_PRODUCTS: Product[] = [
+const DEMO: Omit<Product, "slug">[] = [
   {
     id: 1001,
     name: "Audífonos inalámbricos Pro",
@@ -66,3 +67,5 @@ export const DEMO_PRODUCTS: Product[] = [
     stock: 60,
   },
 ];
+
+export const DEMO_PRODUCTS: Product[] = DEMO.map((p) => ({ ...p, slug: slugify(p.name) }));

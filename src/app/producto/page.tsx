@@ -1,12 +1,16 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
-import { ProductDetail } from "@/components/ProductDetail";
+import { ProductDetailFromQuery } from "@/components/ProductDetail";
+import { ProductSkeleton } from "@/components/ProductView";
 
-export const metadata = { title: "Producto" };
+// Ficha offline heredada (/producto?id=). La pública es /p/[slug]; esta queda para
+// enlaces viejos y carritos guardados antes del SSR. No se indexa.
+export const metadata: Metadata = { title: "Producto", robots: { index: false, follow: true } };
 
 export default function ProductoPage() {
   return (
-    <Suspense fallback={<p className="py-16 text-center text-muted">Cargando…</p>}>
-      <ProductDetail />
+    <Suspense fallback={<ProductSkeleton />}>
+      <ProductDetailFromQuery />
     </Suspense>
   );
 }

@@ -1,5 +1,6 @@
 export type Product = {
   id: number;
+  slug: string; // URL pública: /p/{slug}
   name: string;
   description: string;
   price: number; // COP, entero
@@ -12,6 +13,7 @@ export type Product = {
 
 export type CartItem = {
   productId: number;
+  slug?: string; // los carritos guardados antes del SSR no lo tienen
   name: string;
   price: number;
   image?: string;

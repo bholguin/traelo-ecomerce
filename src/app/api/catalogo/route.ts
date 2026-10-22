@@ -1,21 +1,12 @@
 import { connection } from "next/server";
-import { DEMO_PRODUCTS } from "@/lib/demo-products";
-import { fetchCatalog, wooConfigured } from "@/lib/woo";
+import { getCatalog } from "@/lib/catalogo";
 
+// La PWA descarga el catálogo completo a IndexedDB para el modo sin conexión.
+// Comparte la caché del SSR (getCatalog), así no consulta a Woo en cada llamada.
 export async function GET() {
-  // Siempre en tiempo de petición: el catálogo cambia en Dropi/Woo.
   await connection();
-
-  if (!wooConfigured()) {
-    return Response.json({ demo: true, products: DEMO_PRODUCTS });
-  }
-
   try {
-    const products = await fetchCatalog();
-    return Response.json(
-      { demo: false, products },
-      { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=3600" } },
-    );
+    return Response.json(await getCatalog());
   } catch (e) {
     console.error("[catalogo]", e);
     return Response.json({ error: "No se pudo leer el catálogo" }, { status: 502 });

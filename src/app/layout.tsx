@@ -3,9 +3,11 @@ import { Header } from "@/components/Header";
 import { Pwa } from "@/components/Pwa";
 import { SyncManager } from "@/components/SyncManager";
 import { APP_NAME, APP_TAGLINE, THEME_COLOR } from "@/lib/brand";
+import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   applicationName: APP_NAME,
   title: { default: APP_NAME, template: `%s · ${APP_NAME}` },
   description: APP_TAGLINE,

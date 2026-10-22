@@ -8,7 +8,7 @@ import { useCartCount, useOnline, usePendingCount } from "@/lib/hooks";
 
 // En la ficha y en el checkout la barra inferior se esconde: esas páginas
 // tienen su propio botón fijo abajo.
-const HIDE_DOCK = ["/producto", "/checkout"];
+const HIDE_DOCK = ["/p/", "/producto", "/checkout"];
 
 export function Header() {
   const online = useOnline();
@@ -95,7 +95,7 @@ export function Header() {
 
       {/* Barra flotante en celular. Va fuera del header: backdrop-blur convierte
           al header en el contenedor de los elementos fixed. */}
-      {!HIDE_DOCK.includes(path) && (
+      {!HIDE_DOCK.some((prefix) => path.startsWith(prefix)) && (
         <nav
           aria-label="Principal"
           className="fixed inset-x-4 z-30 mx-auto flex max-w-sm gap-1 rounded-full border border-line/70 bg-card/85 p-1.5 shadow-xl shadow-ink/10 backdrop-blur-xl sm:hidden"
