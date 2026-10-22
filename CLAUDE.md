@@ -80,6 +80,7 @@ Estados (`OrderStatus` en `types.ts`): `pendiente` → `enviando` → `enviado`.
 - Error de red o 5xx → `error`, con reintento automático y espera creciente (`2^intentos × 5 s`, máximo 15 min).
 - Error de negocio o validación (respuesta `{ok:false, kind:"business"|"validation"}`) → `revision`. No se reintenta solo; se muestra al cliente con un botón "Reintentar ahora".
 - Seguimiento: `refreshOrderStatuses()` pide a `POST /api/pedidos/estado` el estado en Woo de los pedidos `enviado` (cada 30 s con la pestaña visible, al abrir y al volver la red) y lo guarda en `remoteStatus`. Deja de consultar los estados finales (`FINAL_REMOTE_STATUSES`). El servidor solo responde si `remoteId` y `clientOrderId` coinciden.
+- Al guardar un pedido, `enqueueOrder` pide `navigator.storage.persist()` para que el navegador no borre IndexedDB por su cuenta. El navegador decide si lo concede; Chrome suele hacerlo con la PWA instalada. No protege de un borrado manual.
 - Cada pedido tiene un `clientOrderId` (UUID). El servidor lo guarda en el meta `_pwa_client_order_id` y, si llega repetido, devuelve el pedido existente. Hoy busca entre los últimos 50 pedidos; con más volumen hará falta un índice propio.
 
 ## API de pedidos: reglas del servidor

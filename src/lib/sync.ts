@@ -53,8 +53,22 @@ export async function enqueueOrder(customer: Customer): Promise<QueuedOrder> {
     await db.orders.add(order);
     await db.cart.clear();
   });
+  void requestPersistentStorage();
   void flushQueue();
   return order;
+}
+
+// Pide al navegador que no borre IndexedDB por su cuenta (por falta de espacio o,
+// en Safari, por días sin abrir el sitio). No protege de un borrado manual.
+// Se pide al guardar un pedido: antes no hay nada que valga la pena conservar.
+// El navegador decide si lo concede; si no, todo sigue funcionando igual.
+async function requestPersistentStorage() {
+  try {
+    if (!navigator.storage?.persist || (await navigator.storage.persisted())) return;
+    await navigator.storage.persist();
+  } catch {
+    // Navegador sin StorageManager: nada que hacer.
+  }
 }
 
 let flushing = false;
