@@ -1,47 +1,40 @@
-# Tienda PWA offline · WooCommerce + Dropi
+# Tienda PWA · WooCommerce + Dropi + Wompi
 
-PWA en Next.js 16 que muestra el catálogo de Dropi, toma pedidos **aun sin conexión** (producto contra entrega, envío pagado al confirmar) y los envía a WooCommerce cuando vuelve la señal. El plugin oficial de Dropi para WooCommerce (Dropify) crea el pedido en Dropi.
+PWA en Next.js 16 que muestra el catálogo de Dropi con SSR y toma pedidos con **producto contra entrega** y **envío pagado al confirmar con Wompi**. Los pedidos se crean en WooCommerce y el plugin oficial de Dropi (Dropify) los crea en Dropi. No funciona sin conexión.
 
 ```
 Celular (PWA) ──pedidos──▶ /api/pedidos (Vercel) ──REST──▶ WooCommerce ──plugin Dropify──▶ Dropi
-              ◀─catálogo── /api/catalogo (Vercel) ◀─Store API─┘
+     │      ◀── páginas SSR ── Next (Vercel) ◀─Store API─┘                  ▲
+     └──pago del envío──▶ Wompi ──webhook──▶ /api/pagos/webhook ── "Procesando" ┘
 ```
 
 ## Arrancar
 
 ```bash
 npm install
-npm run dev          # desarrollo (el service worker está apagado en dev)
-npm run build        # next build + serwist build (genera public/sw.js)
-npm start            # producción local: aquí sí funciona el modo offline
+npm run dev          # desarrollo
+npm run build        # next build
+npm start            # producción local
 ```
 
-Sin variables de entorno la tienda corre en **modo demo** con 6 productos de prueba y los pedidos no se crean en ningún lado. Para conectarla, copia `.env.example` a `.env.local` y llena `WC_URL`, `WC_KEY` y `WC_SECRET`.
+Sin variables de entorno la tienda corre en **modo demo** con 6 productos de prueba y los pedidos no se crean en ningún lado. Para conectarla, copia `.env.example` a `.env.local` y llena `WC_URL`, `WC_KEY` y `WC_SECRET`. Para cobrar el envío en línea, agrega las cuatro variables de Wompi.
 
 ## Desplegar en Vercel
 
 1. Sube el repo a GitHub y en Vercel → *Add New Project* → importa el repo.
-2. *Build Command*: deja el de `package.json` (`next build && serwist build serwist.config.mjs`).
-3. En *Settings → Environment Variables* crea `WC_URL`, `WC_KEY`, `WC_SECRET` (nunca con prefijo `NEXT_PUBLIC_`).
+2. En *Settings → Environment Variables* crea `WC_URL`, `WC_KEY`, `WC_SECRET` y las de Wompi (`NEXT_PUBLIC_WOMPI_PUBLIC_KEY`, `WOMPI_PRIVATE_KEY`, `WOMPI_INTEGRITY_SECRET`, `WOMPI_EVENTS_SECRET`). Solo la llave pública de Wompi lleva `NEXT_PUBLIC_`.
+3. En el panel de Wompi → *Desarrolladores* → URL de eventos: `https://<tu-dominio>/api/pagos/webhook` (una para sandbox y otra para producción).
 4. Despliega y abre la URL en el celular → *Agregar a pantalla de inicio*.
 
-## Cómo funciona el offline
+## Cómo funciona un pedido
 
-| Qué | Dónde se guarda | Estrategia |
-| --- | --- | --- |
-| Páginas y JS/CSS | Cache Storage (precache de Serwist) | Se instalan en la primera visita |
-| Catálogo | IndexedDB (`products`) | Se lee siempre local, se refresca cada 10 min y al volver la red |
-| Fotos | Cache Storage `fotos-productos` | Cache-first, 400 fotos, 30 días |
-| Carrito | IndexedDB (`cart`) | Local |
-| Pedidos | IndexedDB (`orders`) | Cola: se guarda primero, se envía después |
+1. El carrito vive en `localStorage` del navegador.
+2. Al confirmar, el checkout envía el pedido a `/api/pedidos`. El servidor recalcula precios, stock y envío, y crea el pedido en Woo **"En espera"**. Cada pedido lleva un `clientOrderId` (UUID): si el cliente reintenta tras un error de red, el servidor devuelve el pedido existente en vez de crear otro.
+3. Si el destino tiene tarifa (`src/config/envios.ts`) y Wompi está configurado, el cliente pasa al checkout de Wompi para pagar el envío (PSE, Nequi, tarjeta…). El monto sale del pedido en Woo, no del navegador, y va firmado.
+4. Wompi avisa al webhook. Con el pago aprobado, el pedido pasa a **"Procesando"** (sin marcarlo como pagado: el producto se cobra contra entrega), con una nota y el id de la transacción. Al volver a `/pago`, la app también consulta la transacción por si el webhook tarda.
+5. Si el pago se rechaza, el pedido sigue "En espera" y el cliente puede pagar de nuevo desde *Mis pedidos*. Sin tarifa para el destino, el envío se coordina con el cliente como antes.
 
-Estados de un pedido: `pendiente` → `enviando` → `enviado`. Un error de red pasa a `error` y se reintenta con espera creciente (hasta 15 min). Un error de negocio (agotado, precio cambiado) pasa a `revision` y se muestra al cliente.
-
-Cada pedido lleva un `clientOrderId` (UUID). El servidor lo guarda en el meta `_pwa_client_order_id` y, si llega repetido por un reintento, devuelve el pedido existente en vez de crear otro.
-
-La ficha de producto es una sola ruta, `/producto?id=123`, que lee de IndexedDB. Por eso abre sin red.
-
-iOS no soporta Background Sync: la cola se vacía al abrir la app, al volver la conexión y cada 30 s mientras la app está abierta.
+*Mis pedidos* muestra los pedidos guardados en ese navegador y consulta su estado en Woo cada 30 s.
 
 ## ⚠️ Verificar antes de lanzar (Fase 0)
 
@@ -49,7 +42,7 @@ El plugin de Dropi crea el pedido en Dropi cuando WooCommerce lo registra. **No 
 
 Prueba:
 
-La app crea el pedido en Woo **"En espera"** porque el envío se paga al confirmar y todavía no está pagado. Cuando confirmas el pago del envío, lo pasas a mano a **"Procesando"**.
+La app crea el pedido en Woo **"En espera"** porque el envío se paga al confirmar y todavía no está pagado. Cuando Wompi aprueba el pago del envío, la app lo pasa sola a **"Procesando"** (si el pago se coordinó a mano, lo pasas tú).
 
 1. Configura las variables y haz un pedido real desde la PWA. Debe aparecer en Woo "En espera", con una línea de envío.
 2. Cámbialo a "Procesando" y revisa que aparezca en tu panel de Dropi.
@@ -61,23 +54,23 @@ La app crea el pedido en Woo **"En espera"** porque el envío se paga al confirm
 ```
 src/
   app/
-    page.tsx               catálogo
-    producto/page.tsx      ficha (lee de IndexedDB)
-    carrito/ checkout/ pedidos/ offline/
-    api/catalogo/route.ts  Store API de Woo → JSON (o demo)
-    api/pedidos/route.ts   valida, recalcula precios, crea el pedido en Woo
-    sw.ts                  service worker (Serwist)
+    page.tsx  p/[slug]/  c/[slug]/  buscar/   páginas SSR
+    carrito/  checkout/  pedidos/  pago/       cliente
+    api/pedidos/           crea el pedido en Woo (+ /estado)
+    api/pagos/             URL firmada de Wompi (+ /estado, /webhook)
     manifest.ts
   lib/
-    db.ts                  IndexedDB con Dexie
-    sync.ts                refresco de catálogo + cola de pedidos
+    storage.ts             carrito y pedidos en localStorage
+    pedidos.ts             envío del pedido, pago del envío, estados
     woo.ts                 cliente WooCommerce (solo servidor)
+    wompi.ts               cliente Wompi (solo servidor)
   components/
-serwist.config.mjs
+public/sw.js               service worker "de baja": desinstala el de la versión offline
 ```
 
 ## Pendiente para producción
 
+- Probar Wompi en sandbox: pago aprobado, rechazado y PSE pendiente; después, llaves de producción.
+- Definir las tarifas de envío (`src/config/envios.ts`). Mientras estén vacías, todo destino sale "Por confirmar" y no se cobra en línea.
 - Anti-spam en el checkout (por ejemplo Cloudflare Turnstile) y límite de pedidos por IP.
-- Costo de envío: depende del destino y las tarifas aún no están definidas (`src/config/envios.ts`); mientras tanto sale "Por confirmar". El cobro del envío se coordina a mano hasta integrar una pasarela de pagos.
-- Reemplazar el nombre "Tienda", los colores y los íconos de `public/`.
+- Reemplazar el nombre provisional, los colores y los íconos de `public/`.

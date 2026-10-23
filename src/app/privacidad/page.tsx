@@ -124,6 +124,11 @@ export default function PrivacidadPage() {
               pedido. Reciben tu nombre, celular, dirección y los datos del pedido.
             </li>
             <li>
+              Wompi, la pasarela con la que pagas el envío en línea. Recibe tu nombre, celular, correo (si lo diste) y
+              el valor del pago. Los datos de tu medio de pago los pide y los trata Wompi directamente, según su
+              propia política.
+            </li>
+            <li>
               Nuestros proveedores tecnológicos (alojamiento del sitio y gestión de pedidos), que tratan los datos por
               cuenta nuestra y bajo nuestras instrucciones. Algunos pueden tener sus servidores fuera de Colombia; en
               esos casos exigimos que protejan tus datos según la ley colombiana.
@@ -135,13 +140,12 @@ export default function PrivacidadPage() {
 
         <Seccion secciones={SECCIONES} id="celular">
           <p>
-            Para que la tienda funcione sin conexión, tu carrito, tus pedidos y los datos de entrega que escribes se
-            guardan también en tu celular, en el almacenamiento del navegador. Esa información no nos llega hasta que
-            confirmas el pedido y hay conexión.
+            Como no hay cuentas de cliente, tu carrito y tus pedidos se guardan en tu celular, en el almacenamiento del
+            navegador, para que puedas verlos y seguirlos. El carrito no nos llega hasta que confirmas el pedido.
           </p>
           <p>
-            Puedes borrarla cuando quieras eliminando los datos del sitio en la configuración de tu navegador. Ten en
-            cuenta que, si lo haces con un pedido que todavía no se ha enviado, ese pedido se pierde.
+            Puedes borrar esa información cuando quieras eliminando los datos del sitio en la configuración de tu
+            navegador. Tus pedidos no se cancelan: solo dejas de verlos en Mis pedidos.
           </p>
         </Seccion>
 

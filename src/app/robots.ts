@@ -8,8 +8,8 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: "*",
       allow: "/",
-      // Páginas del dispositivo del cliente o de respaldo offline: sin valor en Google.
-      disallow: ["/api/", "/carrito", "/checkout", "/pedidos", "/offline", "/producto"],
+      // Páginas del dispositivo del cliente o del pago: sin valor en Google.
+      disallow: ["/api/", "/carrito", "/checkout", "/pedidos", "/pago"],
     },
   };
 }

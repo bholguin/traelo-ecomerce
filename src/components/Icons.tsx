@@ -93,13 +93,6 @@ export const CashIcon = (p: IconProps) => (
   </Icon>
 );
 
-export const OfflineIcon = (p: IconProps) => (
-  <Icon {...p}>
-    <path d="M2 8.5a15 15 0 0 1 4.5-2.8M10 5a15 15 0 0 1 12 3.5M5.5 12a10 10 0 0 1 3-1.8M14 10.3a10 10 0 0 1 4.5 1.7M9 15.5a5 5 0 0 1 6 0" />
-    <path d="M12 19h.01M3 3l18 18" />
-  </Icon>
-);
-
 export const ArrowLeftIcon = (p: IconProps) => (
   <Icon {...p}>
     <path d="M19 12H5M11 6l-6 6 6 6" />

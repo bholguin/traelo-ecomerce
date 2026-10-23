@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, ViewTransition, type ReactNode } from "react";
 import { MinusIcon, PlusIcon } from "@/components/Icons";
 import { ProductImage } from "@/components/ProductImage";
-import { addToCart } from "@/lib/db";
+import { addToCart } from "@/lib/storage";
 import { discountOf, formatCOP } from "@/lib/format";
 import type { Product } from "@/lib/types";
 
@@ -91,8 +91,8 @@ export function AddToCart({ product }: { product: Product }) {
         </button>
       </div>
       <button
-        onClick={async () => {
-          await addToCart(product, qty);
+        onClick={() => {
+          addToCart(product, qty);
           router.push("/carrito");
         }}
         className="flex h-12 flex-1 items-center justify-between gap-2 rounded-full bg-ink px-5 font-semibold text-surface transition-transform active:scale-[0.98]"

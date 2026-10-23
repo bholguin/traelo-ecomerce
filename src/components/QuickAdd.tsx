@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { CheckIcon, PlusIcon } from "@/components/Icons";
-import { addToCart } from "@/lib/db";
+import { addToCart } from "@/lib/storage";
 import type { Product } from "@/lib/types";
 
 // Isla interactiva dentro de la tarjeta (que se renderiza en el servidor).
@@ -11,8 +11,8 @@ export function QuickAdd({ product }: { product: Product }) {
   return (
     <>
       <button
-        onClick={async () => {
-          await addToCart(product);
+        onClick={() => {
+          addToCart(product);
           setAdded(true);
           setTimeout(() => setAdded(false), 1200);
         }}

@@ -4,14 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build && serwist build serwist.config.mjs",
+    "build": "next build",
     "start": "next start",
     "lint": "eslint"
   },
   "dependencies": {
-    "@serwist/next": "^9.5.13",
-    "dexie": "^4.4.6",
-    "dexie-react-hooks": "^4.4.0",
     "next": "16.4.2",
     "react": "19.3.0",
     "react-dom": "19.3.0",
@@ -19,15 +16,12 @@
     "server-only": "^0.0.1"
   },
   "devDependencies": {
-    "@serwist/cli": "^9.5.13",
     "@tailwindcss/turbopack": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "esbuild": "^0.28.2",
     "eslint": "^9",
     "eslint-config-next": "16.4.2",
-    "serwist": "^9.5.13",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

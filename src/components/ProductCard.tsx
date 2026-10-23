@@ -6,7 +6,6 @@ import { discountOf, formatCOP } from "@/lib/format";
 import type { Product } from "@/lib/types";
 
 // Tarjeta renderizada en el servidor; solo el botón "+" es interactivo.
-// href: la ficha SSR (/p/slug). El catálogo offline pasa la ficha de IndexedDB.
 export function ProductCard({ product: p, href = `/p/${p.slug}` }: { product: Product; href?: string }) {
   const discount = discountOf(p);
   const lowStock = typeof p.stock === "number" && p.stock > 0 && p.stock <= 5;

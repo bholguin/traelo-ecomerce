@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeftIcon, CashIcon, OfflineIcon, TruckIcon } from "@/components/Icons";
+import { ArrowLeftIcon, CashIcon, PackageIcon, TruckIcon } from "@/components/Icons";
 import { AddToCart, FocusHeading, Gallery } from "@/components/ProductIslands";
 import { discountOf, formatCOP, slugify } from "@/lib/format";
 import type { Product } from "@/lib/types";
@@ -7,12 +7,11 @@ import type { Product } from "@/lib/types";
 const PERKS = [
   { icon: CashIcon, title: "Producto contra entrega", text: "En efectivo al recibirlo. El envío se paga al pedir." },
   { icon: TruckIcon, title: "Toda Colombia", text: "Te lo llevamos a tu municipio." },
-  { icon: OfflineIcon, title: "Sin señal", text: "Tu pedido se guarda y sale solo." },
+  { icon: PackageIcon, title: "Sigue tu pedido", text: "Su estado aparece en Mis pedidos." },
 ];
 
-// Ficha de producto. Sin "use client" a propósito: en /p/[slug] se renderiza en
-// el servidor (SSR) y la vista offline la reutiliza en el navegador con los
-// datos de IndexedDB. Lo interactivo vive en ProductIslands.
+// Ficha de producto, renderizada en el servidor (SSR). Lo interactivo vive en
+// ProductIslands.
 export function ProductView({ product }: { product: Product }) {
   const discount = discountOf(product);
   const lowStock = typeof product.stock === "number" && product.stock > 0 && product.stock <= 10;

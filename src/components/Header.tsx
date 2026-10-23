@@ -2,18 +2,19 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BagIcon, OfflineIcon, PackageIcon, StoreIcon } from "@/components/Icons";
+import { BagIcon, PackageIcon, StoreIcon } from "@/components/Icons";
 import { APP_NAME } from "@/lib/brand";
-import { useCartCount, useOnline, usePendingCount } from "@/lib/hooks";
+import { canPayShipping } from "@/lib/pedidos";
+import { useCartCount, useOrders } from "@/lib/storage";
 
 // En la ficha y en el checkout la barra inferior se esconde: esas páginas
 // tienen su propio botón fijo abajo.
-const HIDE_DOCK = ["/p/", "/producto", "/checkout"];
+const HIDE_DOCK = ["/p/", "/checkout"];
 
 export function Header() {
-  const online = useOnline();
   const cartCount = useCartCount();
-  const pending = usePendingCount();
+  // Pedidos con el envío por pagar: el cliente tiene algo que hacer en Mis pedidos.
+  const pending = useOrders()?.filter(canPayShipping).length ?? 0;
   const path = usePathname();
 
   const nav = [
@@ -52,23 +53,6 @@ export function Header() {
           </nav>
 
           <div className="ml-auto flex items-center gap-2">
-            <span
-              aria-live="polite"
-              className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${
-                online ? "text-muted" : "bg-ink text-surface"
-              }`}
-            >
-              {online ? (
-                <span className="relative flex size-2">
-                  <span className="absolute inline-flex size-full rounded-full bg-ok opacity-60 motion-safe:animate-ping" />
-                  <span className="relative inline-flex size-2 rounded-full bg-ok" />
-                </span>
-              ) : (
-                <OfflineIcon width={14} height={14} />
-              )}
-              <span className={online ? "hidden sm:inline" : ""}>{online ? "En línea" : "Sin señal"}</span>
-            </span>
-
             {/* Visible en todos los tamaños: en la ficha y el checkout no hay barra inferior. */}
             <Link
               href="/carrito"
@@ -85,12 +69,6 @@ export function Header() {
             </Link>
           </div>
         </div>
-
-        {!online && (
-          <p className="border-t border-line/70 bg-soft px-4 py-2 text-center text-xs text-ink">
-            Puedes seguir comprando: tu pedido se guarda en el celular y sale solo cuando vuelva la señal.
-          </p>
-        )}
       </header>
 
       {/* Barra flotante en celular. Va fuera del header: backdrop-blur convierte

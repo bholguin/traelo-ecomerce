@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CashIcon, OfflineIcon, TruckIcon } from "@/components/Icons";
+import { CashIcon, ShieldIcon, TruckIcon } from "@/components/Icons";
 import { ProductImage } from "@/components/ProductImage";
 import { QuickAdd } from "@/components/QuickAdd";
 import { getCatalog, getCategories } from "@/lib/catalogo";
@@ -83,7 +83,7 @@ const MODELO_DE_PAGO = "Al pedir solo pagas el envío. El producto lo pagas en e
 const PERKS = [
   { icon: CashIcon, label: "El envío se paga al pedir" },
   { icon: TruckIcon, label: "Envío a toda Colombia" },
-  { icon: OfflineIcon, label: "Compra sin señal" },
+  { icon: ShieldIcon, label: "Sin crear cuenta" },
 ];
 
 function HeroClasico() {
@@ -93,8 +93,7 @@ function HeroClasico() {
       <Pastilla>Producto contra entrega</Pastilla>
       <Titular />
       <Subtitulo>
-        Al pedir solo pagas el envío; el producto, en efectivo cuando te llega. Y si te quedas sin señal, tu pedido se
-        guarda y sale solo cuando vuelva.
+        Al pedir solo pagas el envío; el producto, en efectivo cuando te llega.
       </Subtitulo>
       <ul className="mt-6 flex flex-wrap gap-2">
         {PERKS.map(({ icon: Icon, label }) => (
@@ -114,7 +113,7 @@ function HeroClasico() {
 // ---------- Pasos ----------
 
 const PASOS = [
-  { title: "Pides y pagas el envío", text: "Nombre, celular y dirección. Puedes armarlo sin señal." },
+  { title: "Pides y pagas el envío", text: "Nombre, celular y dirección. Nada más." },
   { title: "Te lo llevamos", text: "A tu municipio, en cualquier parte de Colombia." },
   { title: "Pagas el producto al recibir", text: "En efectivo, cuando lo tienes en la mano." },
 ];

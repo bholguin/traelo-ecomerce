@@ -86,17 +86,15 @@ export default function TerminosPage() {
             entregarte.
           </p>
           <p>
-            Puedes armar y confirmar el pedido aunque no tengas señal. En ese caso el pedido queda guardado en tu
-            celular y se envía automáticamente cuando vuelva la conexión. Lo recibimos cuando, en{" "}
+            Para confirmar el pedido necesitas conexión a internet. Lo recibimos cuando aparece en{" "}
             <Link href="/pedidos" className="underline">
               Mis pedidos
-            </Link>
-            , aparece con estado &ldquo;Recibido&rdquo; y un número de pedido. Mientras siga &ldquo;Guardado, esperando
-            señal&rdquo;, todavía no nos ha llegado.
+            </Link>{" "}
+            con un número de pedido.
           </p>
           <p>
             Al recibir el pedido verificamos el precio y la disponibilidad de cada producto. Si algo cambió (por
-            ejemplo, el producto se agotó o su precio cambió), no procesamos el pedido y te lo indicamos en Mis pedidos
+            ejemplo, el producto se agotó o su precio cambió), no creamos el pedido y te lo indicamos al confirmar
             para que lo revises antes de volver a enviarlo.
           </p>
         </Seccion>
@@ -120,9 +118,14 @@ export default function TerminosPage() {
           </p>
           <p>
             <strong>Envío:</strong> lo pagas al confirmar el pedido. Su valor depende del departamento y la ciudad de
-            destino, y se muestra antes de que confirmes. Si para tu destino aparece &ldquo;Por confirmar&rdquo;, te
-            informamos el valor antes de cobrarlo. Mientras habilitamos el pago en línea, te contactamos al celular que
-            registraste para coordinar el pago del envío.
+            destino, y se muestra antes de que confirmes. Si tu destino tiene tarifa, lo pagas en línea al confirmar,
+            a través de la pasarela Wompi, con los medios que ella ofrece (por ejemplo PSE, Nequi o tarjeta). Los
+            datos de tu medio de pago los recibe y procesa Wompi: nosotros no los conocemos. Si para tu destino
+            aparece &ldquo;Por confirmar&rdquo;, te informamos el valor antes de cobrarlo y te contactamos al celular
+            que registraste para coordinar el pago.
+          </p>
+          <p>
+            Si el pago en línea no se completa, el pedido queda pendiente y puedes pagarlo de nuevo desde Mis pedidos.
           </p>
           <p>Tu pedido se despacha cuando confirmamos el pago del envío.</p>
         </Seccion>
@@ -214,8 +217,8 @@ export default function TerminosPage() {
             compartimos solo con los proveedores y operadores logísticos que intervienen en la entrega.
           </p>
           <p>
-            Tus pedidos y tu carrito también se guardan en tu celular, para que la tienda funcione sin conexión; puedes
-            borrarlos borrando los datos del sitio en tu navegador.
+            Tus pedidos y tu carrito también se guardan en tu celular, para que puedas verlos sin crear una cuenta;
+            puedes borrarlos borrando los datos del sitio en tu navegador.
           </p>
           <p>
             Tratamos tus datos según la Ley 1581 de 2012. Puedes conocer, actualizar, rectificar o pedir que eliminemos

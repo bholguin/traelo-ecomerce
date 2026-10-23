@@ -1,3 +1,4 @@
+import { pagoEnLinea } from "@/lib/envio";
 import { formatCOP } from "@/lib/format";
 
 // Desglose del modelo de pago: envío al confirmar, productos contra entrega.
@@ -42,8 +43,11 @@ export function PagoResumen({
 export const envioLabel = (envio: number | null | undefined) =>
   envio === undefined ? "Según tu destino" : envio === null ? "Por confirmar" : formatCOP(envio);
 
-// Mientras no haya pasarela de pagos, el envío se cobra coordinando con el cliente.
+// Con tarifa y Wompi configurado, el envío se paga en línea al confirmar; si no,
+// se cobra coordinando con el cliente.
 export const notaPagoEnvio = (envio: number | null | undefined) =>
-  envio === null
-    ? "Aún no tenemos tarifa para tu destino: te contactaremos al celular que registres para confirmarte el valor del envío y coordinar el pago."
-    : "Te contactaremos al celular que registres para coordinar el pago del envío.";
+  pagoEnLinea(envio)
+    ? "Al confirmar te llevamos a Wompi para pagarlo con PSE, Nequi o tarjeta."
+    : envio === null
+      ? "Aún no tenemos tarifa para tu destino: te contactaremos al celular que registres para confirmarte el valor del envío y coordinar el pago."
+      : "Te contactaremos al celular que registres para coordinar el pago del envío.";

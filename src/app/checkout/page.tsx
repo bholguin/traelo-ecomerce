@@ -4,14 +4,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { useForm, useWatch, type FieldError } from "react-hook-form";
-import { CashIcon, OfflineIcon, TruckIcon } from "@/components/Icons";
+import { CashIcon, TruckIcon } from "@/components/Icons";
 import { envioLabel, notaPagoEnvio, PagoResumen } from "@/components/PagoResumen";
 import { ProductImage } from "@/components/ProductImage";
 import { DEPARTAMENTOS } from "@/lib/colombia";
-import { costoEnvio } from "@/lib/envio";
+import { costoEnvio, pagoEnLinea } from "@/lib/envio";
 import { formatCOP } from "@/lib/format";
-import { useCart, useOnline } from "@/lib/hooks";
-import { enqueueOrder } from "@/lib/sync";
+import { canPayShipping, payShipping, submitOrder } from "@/lib/pedidos";
+import { useCart } from "@/lib/storage";
 import type { Customer } from "@/lib/types";
 
 type CheckoutForm = {
@@ -89,11 +89,13 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
 
 export default function CheckoutPage() {
   const cart = useCart();
-  const online = useOnline();
   const router = useRouter();
-  // Se queda en true al guardar: el carrito se vacía y, sin esto, el efecto de
-  // abajo mandaría al carrito vacío antes de llegar a Mis pedidos.
+  // Se queda en true al enviar: el carrito se vacía y, sin esto, el efecto de
+  // abajo mandaría al carrito vacío antes de llegar a Mis pedidos o a Wompi.
   const [sending, setSending] = useState(false);
+  // Un id por pedido, no por intento: si la respuesta se pierde y el cliente
+  // vuelve a confirmar, el servidor devuelve el pedido ya creado.
+  const [clientOrderId, setClientOrderId] = useState<string | null>(null);
 
   const {
     register,
@@ -134,13 +136,18 @@ export default function CheckoutPage() {
       notes: v.notes.trim() || undefined,
     };
     setSending(true);
-    try {
-      const order = await enqueueOrder(customer);
-      router.push(`/pedidos?nuevo=${order.clientOrderId}`);
-    } catch (err) {
-      setError("root", { message: err instanceof Error ? err.message : "No se pudo guardar el pedido" });
+    const id = clientOrderId ?? crypto.randomUUID();
+    setClientOrderId(id);
+    const result = await submitOrder(id, customer, costoEnvio(customer.department, customer.city));
+    if (!result.ok) {
+      setError("root", { message: result.message });
       setSending(false);
+      return;
     }
+    // Con tarifa y Wompi configurado, el cliente sigue directo al pago del envío.
+    // Si no se pudo abrir el pago, lo puede hacer desde Mis pedidos.
+    if (canPayShipping(result.order) && (await payShipping(result.order)) === null) return;
+    router.push(`/pedidos?nuevo=${result.order.clientOrderId}`);
   }
 
   return (
@@ -248,7 +255,6 @@ export default function CheckoutPage() {
                   Envío: lo pagas al confirmar
                   <span className="text-right tabular-nums">{envioLabel(envio)}</span>
                 </span>
-                {/* Cuando exista la pasarela de pagos, aquí va el pago en línea del envío. */}
                 <span className="block text-sm text-muted">
                   {envio === undefined ? "Elige el departamento para calcularlo." : notaPagoEnvio(envio)}
                 </span>
@@ -290,14 +296,6 @@ export default function CheckoutPage() {
             </div>
           </div>
 
-          {!online && (
-            <p className="flex gap-3 rounded-3xl bg-soft p-4 text-sm">
-              <OfflineIcon className="mt-0.5 shrink-0" />
-              Estás sin señal. Tu pedido se guarda en el celular y se envía solo cuando vuelva la conexión. Después
-              coordinamos contigo el pago del envío.
-            </p>
-          )}
-
           {errors.root?.message && (
             <p role="alert" className="rounded-2xl bg-bad/10 p-3 text-sm font-medium text-bad">
               {errors.root.message}
@@ -309,7 +307,7 @@ export default function CheckoutPage() {
             disabled={sending}
             className="flex h-14 w-full items-center justify-between rounded-full bg-ink px-6 font-semibold text-surface transition-transform active:scale-[0.98] disabled:opacity-60"
           >
-            <span>{sending ? "Guardando…" : online ? "Confirmar pedido" : "Guardar pedido"}</span>
+            <span>{sending ? "Enviando…" : pagoEnLinea(envio) ? "Confirmar y pagar envío" : "Confirmar pedido"}</span>
             <span className="font-display tabular-nums">{formatCOP(total + (envio ?? 0))}</span>
           </button>
           <p className="text-center text-xs text-muted">

@@ -104,10 +104,13 @@ type WcOrder = {
   status: string;
   total: string;
   shipping_total?: string;
+  billing?: { first_name: string; last_name: string; phone: string; email?: string };
   meta_data: { key: string; value: unknown }[];
 };
 
 export const CLIENT_ORDER_META = "_pwa_client_order_id";
+const SHIPPING_META = "_pwa_envio";
+const PAYMENT_META = "_pwa_pago_wompi"; // id de la transacción de Wompi que pagó el envío
 
 // Evita duplicados cuando la PWA reintenta: busca entre los pedidos recientes
 // uno con el mismo client_order_id. Suficiente para el MVP; con mucho volumen
@@ -159,7 +162,8 @@ export async function createCodOrder(input: {
     method: "POST",
     body: JSON.stringify({
       // "on-hold" (En espera): el envío se paga al confirmar y todavía no está
-      // pagado. Al confirmar el pago, pasa el pedido a "Procesando" en Woo.
+      // pagado. Con Wompi pasa solo a "Procesando" (markShippingPaid); si el pago
+      // se coordinó con el cliente, se pasa a mano.
       // VERIFICAR EN FASE 0: que el plugin de Dropi cree el pedido en Dropi al
       // cambiar de "En espera" a "Procesando", y que el valor a recaudar sea solo
       // el de los productos (sin el envío, que ya se pagó). Ver README.
@@ -179,9 +183,66 @@ export async function createCodOrder(input: {
       meta_data: [
         { key: CLIENT_ORDER_META, value: input.clientOrderId },
         { key: "_pwa_origen", value: "pwa" },
-        // Cuando exista pasarela de pagos, aquí quedará la referencia del pago.
-        { key: "_pwa_envio", value: input.shipping ? "pendiente de pago" : "por cotizar" },
+        // Al pagar el envío con Wompi pasa a "pagado" (ver markShippingPaid).
+        { key: SHIPPING_META, value: input.shipping ? "pendiente de pago" : "por cotizar" },
       ],
     }),
   });
+}
+
+const orderMeta = (o: WcOrder, key: string) => o.meta_data.find((m) => m.key === key)?.value;
+
+// Pedido para cobrar su envío. Solo lo devuelve si trae el client_order_id
+// correcto, igual que fetchOrderStatuses.
+export async function fetchOrderForPayment(id: number, clientOrderId: string): Promise<WcOrder | null> {
+  const order = await wcRest<WcOrder>(`/orders/${id}`).catch(() => null);
+  return order && orderMeta(order, CLIENT_ORDER_META) === clientOrderId ? order : null;
+}
+
+const addOrderNote = (id: number, note: string) =>
+  wcRest(`/orders/${id}/notes`, { method: "POST", body: JSON.stringify({ note, customer_note: false }) });
+
+export type ShippingPaymentResult = "pagado" | "ya-registrado" | "revisar";
+
+// Registra en Woo un pago aprobado del envío. La llaman el webhook de Wompi y la
+// página de regreso (/api/pagos/estado), así que puede llegar dos veces: si la
+// transacción ya está registrada, no hace nada.
+//
+// Pasa el pedido de "En espera" a "Procesando" SIN set_paid: el producto sigue
+// siendo contra entrega. VERIFICAR EN FASE 0 que este cambio dispare la creación
+// del pedido en Dropi y que el valor a recaudar sea solo el de los productos.
+export async function markShippingPaid(
+  orderId: number,
+  tx: { id: string; amount_in_cents: number; currency: string },
+): Promise<ShippingPaymentResult> {
+  const order = await wcRest<WcOrder>(`/orders/${orderId}`);
+  if (orderMeta(order, PAYMENT_META) === tx.id) return "ya-registrado";
+
+  const expected = Math.round(Number(order.shipping_total ?? 0) * 100);
+  const pago = `Wompi ${tx.id} por $${tx.amount_in_cents / 100} ${tx.currency}`;
+  const problema =
+    tx.currency !== "COP" || tx.amount_in_cents !== expected
+      ? `pero el envío del pedido es de $${expected / 100}`
+      : order.status !== "on-hold"
+        ? `con el pedido en estado "${order.status}"` // cancelado o ya pasado a mano: ¿reembolso?
+        : null;
+  if (problema) {
+    // El pedido no cambia de estado; el pago queda registrado y anotado una sola vez.
+    await wcRest(`/orders/${orderId}`, { method: "PUT", body: JSON.stringify({ meta_data: [{ key: PAYMENT_META, value: tx.id }] }) });
+    await addOrderNote(orderId, `Pago de envío aprobado (${pago}) ${problema}. Revisar a mano.`);
+    return "revisar";
+  }
+
+  await wcRest(`/orders/${orderId}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      status: "processing",
+      meta_data: [
+        { key: SHIPPING_META, value: "pagado" },
+        { key: PAYMENT_META, value: tx.id },
+      ],
+    }),
+  });
+  await addOrderNote(orderId, `Envío pagado: ${pago}.`);
+  return "pagado";
 }

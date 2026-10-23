@@ -1,12 +1,12 @@
-# Contexto del proyecto: Tienda PWA offline + WooCommerce + Dropi
+# Contexto del proyecto: Tienda PWA + WooCommerce + Dropi + Wompi
 
 Lee también `AGENTS.md`: esta es Next.js 16.4 y sus APIs difieren de versiones anteriores. Antes de escribir código de Next, consulta `node_modules/next/dist/docs/`.
 
 ## Qué es
 
-Una PWA responsive para Colombia. Vende productos del catálogo de **Dropi** (dropshipping colombiano). **El producto se paga contra entrega y el envío se paga al confirmar el pedido.** Tiene dos requisitos centrales:
-- **SSR primero, por SEO:** todo lo público (inicio, categorías, fichas) se renderiza en el servidor con datos de Woo, para que Google lo indexe.
-- **Funcionar sin conexión:** el cliente arma el carrito y confirma el pedido sin señal, y el pedido se envía solo cuando vuelve la red. El offline es una capa encima del SSR, no la base.
+Una PWA responsive para Colombia (instalable con el manifest, **sin service worker ni modo offline**). Vende productos del catálogo de **Dropi** (dropshipping colombiano). **El producto se paga contra entrega y el envío se paga al confirmar el pedido, en línea con Wompi.**
+
+**SSR primero, por SEO:** todo lo público (inicio, categorías, fichas) se renderiza en el servidor con datos de Woo, para que Google lo indexe. Lo del dispositivo (carrito, checkout, mis pedidos) es cliente y vive en `localStorage`.
 
 Idioma de la interfaz y de los textos: español de Colombia. Moneda: COP sin decimales.
 
@@ -14,10 +14,12 @@ Idioma de la interfaz y de los textos: español de Colombia. Moneda: COP sin dec
 
 ```
 Celular (PWA Next.js) ──pedidos──▶ /api/pedidos (Vercel) ──REST v3──▶ WooCommerce ──plugin Dropify──▶ Dropi
-                      ◀─catálogo── /api/catalogo (Vercel) ◀─Store API─┘
+       │   ◀── páginas SSR ── Next (Vercel) ◀── Store API ──┘                ▲
+       └──pago del envío──▶ Wompi ──webhook──▶ /api/pagos/webhook ── "Procesando" ┘
 ```
 
-- **Frontend + API:** Next.js 16 (App Router, Turbopack, `cacheComponents` + `partialPrefetching`), desplegado en **Vercel**. Las páginas públicas son server components que leen de `src/lib/catalogo.ts` (caché con `use cache`); solo lo interactivo y lo del dispositivo (carrito, checkout, mis pedidos) es cliente.
+- **Frontend + API:** Next.js 16 (App Router, Turbopack, `cacheComponents` + `partialPrefetching`), desplegado en **Vercel**. Las páginas públicas son server components que leen de `src/lib/catalogo.ts` (caché con `use cache`); solo lo interactivo y lo del dispositivo (carrito, checkout, mis pedidos, resultado del pago) es cliente.
+- **Pagos:** Wompi (Bancolombia), solo para el envío. Ver "Pago del envío con Wompi".
 - **Backend invisible:** WordPress + WooCommerce en modo headless, en un hosting PHP aparte. Sirve de catálogo y de panel de pedidos.
 - **Integración con Dropi:** el plugin oficial de WordPress `wc-dropi-integration` ("Dropify"). Importa los productos de Dropi a Woo y crea en Dropi cada pedido de Woo. Se configura con el access token que da Dropi en *Mis tiendas*. **No llamamos a Dropi directamente**: su API no tiene documentación pública.
 
@@ -26,21 +28,22 @@ Celular (PWA Next.js) ──pedidos──▶ /api/pedidos (Vercel) ──REST v3
 | Decisión | Motivo |
 | --- | --- |
 | PWA, no app nativa | Un solo código; se instala desde el navegador |
-| **SSR primero** (desde la Fase 0 del plan SEO) | Elección del usuario: usar Next por su SSR y posicionar los productos en Google. El offline se mantiene como mejora progresiva |
+| **SSR primero** (desde la Fase 0 del plan SEO) | Elección del usuario: usar Next por su SSR y posicionar los productos en Google |
+| **Sin modo offline** (desde la integración con Wompi) | Elección del usuario: el pago necesita red, y la cola offline + service worker sumaban complejidad. Se quitaron Serwist, Dexie, la cola de pedidos, `/offline` y `/producto`. `public/sw.js` es un service worker "de baja" que desinstala el viejo en los celulares que lo tenían |
+| **Wompi** como pasarela del envío | Elección del usuario. Web Checkout (redirección): los datos de pago nunca pasan por nuestro servidor |
 | Next.js + Vercel | Elección del usuario; los route handlers reemplazan a un mini-plugin de WordPress |
 | WooCommerce como intermediario con Dropi | La integración la resuelve el plugin oficial; evita depender de una API no documentada |
-| Producto contra entrega + envío prepagado al confirmar | Decisión del usuario: reduce pedidos falsos y devoluciones (cada rechazo cuesta flete). Hoy el envío se cobra coordinando con el cliente; **en el futuro, con pasarela de pagos** |
+| Producto contra entrega + envío prepagado al confirmar | Decisión del usuario: reduce pedidos falsos y devoluciones (cada rechazo cuesta flete). El envío se paga con Wompi si hay tarifa; si no ("Por confirmar"), se coordina con el cliente |
 | Sin cuentas de cliente ni login | Fuera del MVP |
 | Llaves de Woo solo en variables de entorno de Vercel | Nunca en el navegador ni con prefijo `NEXT_PUBLIC_` |
-| Serwist para el service worker | Sucesor mantenido de next-pwa; se construye después de `next build` para precachear las rutas prerenderizadas |
 
 ## Stack
 
 - Next.js 16.4, React 19.3, TypeScript, Tailwind CSS v4 (tokens en `src/app/globals.css` con `@theme`)
-- Serwist 9.5 en modo configurador: `serwist.config.mjs` y `serwist build` después de `next build`
-- Dexie 4 + dexie-react-hooks (IndexedDB)
+- `localStorage` con `useSyncExternalStore` para carrito y pedidos (`src/lib/storage.ts`), sin librerías
+- Wompi Web Checkout + eventos (webhook), sin SDK
 - react-hook-form 7 en el checkout (validación por campo con las mismas reglas que `/api/pedidos`; sin librería de esquemas)
-- Sin Google Fonts: se usa la pila de fuentes del sistema, que funciona offline
+- Sin Google Fonts: se usa la pila de fuentes del sistema
 
 ## Estructura
 
@@ -52,57 +55,63 @@ src/app/
   buscar/page.tsx          búsqueda SSR (?q=), noindex
   robots.ts  opengraph-image.tsx   robots (todo bloqueado si !indexable()) e imagen para compartir
   terminos/  privacidad/    términos y política de datos (borradores legales; datos de la tienda en src/config/legal.ts, piezas en components/Legal.tsx)
-  carrito/  checkout/  pedidos/   cliente, leen IndexedDB (se precachean)
-  offline/                 respaldo del SW: según la URL pedida muestra ficha o catálogo desde IndexedDB
-  producto/page.tsx        ficha offline heredada (/producto?id=), noindex
-  api/catalogo/route.ts    catálogo completo para IndexedDB (comparte caché con el SSR)
+  carrito/  checkout/  pedidos/   cliente, leen localStorage
+  pago/page.tsx            regreso de Wompi (/pago?id=<transacción>), noindex
   api/pedidos/route.ts     valida, recalcula precio/stock, deduplica y crea el pedido en Woo
-  sw.ts                    service worker (Serwist)
+  api/pedidos/estado/      estado en Woo de los pedidos del dispositivo
+  api/pagos/route.ts       URL firmada del Web Checkout de Wompi para pagar el envío
+  api/pagos/estado/        consulta la transacción a Wompi al volver (y registra el pago si el webhook no llegó)
+  api/pagos/webhook/       eventos de Wompi: pago aprobado → pedido a "Procesando"
   manifest.ts              manifest PWA
+public/sw.js               service worker "de baja" (no generado: desinstala el de Serwist en celulares viejos)
 src/lib/
-  db.ts       Dexie: tablas products, cart, orders, meta
-  sync.ts     refreshCatalog(), enqueueOrder(), flushQueue(), retryOrder()
+  storage.ts  carrito y pedidos en localStorage: useCart, useCartCount, useOrders, addToCart, saveOrder…
+  pedidos.ts  cliente: submitOrder(), payShipping(), canPayShipping(), refreshOrderStatuses()
   catalogo.ts capa de datos del SSR: getCatalog (use cache + cacheTag "catalogo"), getProductBySlug, getCategories, searchProducts
-  woo.ts      cliente WooCommerce, solo servidor ("server-only")
+  woo.ts      cliente WooCommerce, solo servidor ("server-only"); incluye markShippingPaid()
+  wompi.ts    cliente Wompi, solo servidor: firma de integridad, checkoutUrl, fetchTransaction, verifyEvent
+  envio.ts    costoEnvio() y pagoEnLinea()
   site.ts     SITE_URL: NEXT_PUBLIC_SITE_URL → dominio de producción de Vercel → localhost
   seo.ts      indexable() (solo producción con Woo) y jsonLd() para <script type="application/ld+json">
-  hooks.ts    useOnline, useCart, useCartCount, usePendingCount, useCatalogMeta
   brand.ts    nombre de la tienda y color del tema (un solo lugar)
   types.ts  format.ts  colombia.ts (33 departamentos)  demo-products.ts
 src/components/
-  Header (barra superior + barra flotante en celular), SyncManager, Pwa (SerwistProvider),
-  ProductView (ficha compartida SSR/offline) + ProductIslands (Gallery, AddToCart, FocusHeading),
-  ProductCard + QuickAdd, ProductGrid, CatalogToolbar, OfflineCatalog, ProductDetail (ficha desde IndexedDB),
-  Orders (línea de tiempo), ProductImage, Icons (SVG propios, sin dependencias)
+  Header (barra superior + barra flotante en celular), PagoResumen, PagoResultado,
+  ProductView (ficha SSR) + ProductIslands (Gallery, AddToCart, FocusHeading),
+  ProductCard + QuickAdd, ProductGrid, CatalogToolbar,
+  Orders (línea de tiempo + botón "Pagar envío"), ProductImage, Icons (SVG propios, sin dependencias)
 ```
 
-## Reglas del modo offline (importantes)
+## Reglas del cliente
 
-1. **Las páginas SSR con datos no van al precache** (`globIgnores` en `serwist.config.mjs`): el precache responde desde caché antes que la red y mostraría precios del build. Se guardan al visitarlas (regla `paginas` en `sw.ts`: red primero, 4 s de espera, 80 páginas, 7 días). Si agregas una página pública con datos, agrégala a `globIgnores`.
-2. **Una página nunca visitada, sin señal, cae en `/offline`.** La URL del navegador sigue siendo la pedida, y `OfflineFallback` usa `usePathname()` para mostrar la ficha (`/p/slug`) o el catálogo (`/c/slug`, resto) desde IndexedDB. Por eso `SyncManager` sigue descargando el catálogo completo.
-   - La ficha usa `ProductView` sin `"use client"`, para que la misma interfaz sirva en el SSR y en el offline. No le agregues hooks: lo interactivo va en `ProductIslands`.
-3. **`useSearchParams` va dentro de `<Suspense>`** (lo exige `cacheComponents`).
-4. **El pedido se guarda en IndexedDB antes de enviarse.** Nunca envíes un pedido sin guardarlo primero.
-5. **`reloadOnOnline={false}`** en `SerwistProvider`. El valor por defecto (`true`) recarga la página al volver la red y borraba el checkout a medio llenar.
-6. La API (`/api/*`) nunca se cachea en el service worker (`NetworkOnly`); los datos viven en IndexedDB.
-7. Las fotos usan `<img>`, no `next/image`: la optimización ocurre en el servidor y no funcionaría offline. El service worker las cachea (`fotos-productos`, cache-first, 400 entradas, 30 días).
-8. iOS no tiene Background Sync. `SyncManager` sincroniza al montar, en el evento `online`, al volver la pestaña visible y cada 30 s (cola) y cada 10 min (catálogo).
-9. El service worker está desactivado en `npm run dev`. Para probar el modo offline: `npm run build && npm start`.
+1. **`useSearchParams` va dentro de `<Suspense>`** (lo exige `cacheComponents`).
+2. Los hooks de `storage.ts` devuelven `undefined` en el servidor y antes de hidratar: las páginas muestran "Cargando…". Las páginas de cliente siguen prerenderizándose como estáticas.
+3. Las fotos usan `<img>`, no `next/image` (habría que declarar el dominio de Woo/Dropi en `images.remotePatterns`).
+4. No hay cuentas: "Mis pedidos" es lo que guardó ese navegador. Si el cliente borra los datos del sitio, deja de verlos (el pedido sigue en Woo).
 
-## Cola de pedidos
+## Pedidos
 
-Estados (`OrderStatus` en `types.ts`): `pendiente` → `enviando` → `enviado`.
-- Error de red o 5xx → `error`, con reintento automático y espera creciente (`2^intentos × 5 s`, máximo 15 min).
-- Error de negocio o validación (respuesta `{ok:false, kind:"business"|"validation"}`) → `revision`. No se reintenta solo; se muestra al cliente con un botón "Reintentar ahora".
-- Seguimiento: `refreshOrderStatuses()` pide a `POST /api/pedidos/estado` el estado en Woo de los pedidos `enviado` (cada 30 s con la pestaña visible, al abrir y al volver la red) y lo guarda en `remoteStatus`. Deja de consultar los estados finales (`FINAL_REMOTE_STATUSES`). El servidor solo responde si `remoteId` y `clientOrderId` coinciden.
-- Al guardar un pedido, `enqueueOrder` pide `navigator.storage.persist()` para que el navegador no borre IndexedDB por su cuenta. El navegador decide si lo concede; Chrome suele hacerlo con la PWA instalada. No protege de un borrado manual.
-- Cada pedido tiene un `clientOrderId` (UUID). El servidor lo guarda en el meta `_pwa_client_order_id` y, si llega repetido, devuelve el pedido existente. Hoy busca entre los últimos 50 pedidos; con más volumen hará falta un índice propio.
+- El checkout envía el pedido en línea a `/api/pedidos` (`submitOrder`). Si falla la red o el servidor, muestra el error y el cliente vuelve a confirmar; un 409/400 (`business`/`validation`: agotado, precio o envío cambiado) se muestra igual. **No hay cola ni reintentos automáticos.**
+- Cada pedido tiene un `clientOrderId` (UUID) que el checkout genera una vez por pedido, no por intento. El servidor lo guarda en el meta `_pwa_client_order_id` y, si llega repetido, devuelve el pedido existente. Hoy busca entre los últimos 50 pedidos; con más volumen hará falta un índice propio.
+- Al crearse, el pedido se guarda en `localStorage` (`Order` en `types.ts`, con `remoteId`) y se vacía el carrito. Si se puede pagar el envío en línea, el checkout lleva directo a Wompi; si no, a `/pedidos?nuevo=`.
+- Seguimiento: `refreshOrderStatuses()` pide a `POST /api/pedidos/estado` el estado en Woo (al abrir Mis pedidos, cada 30 s con la pestaña visible y al volver a ella) y lo guarda en `remoteStatus`. Deja de consultar los estados finales (`FINAL_REMOTE_STATUSES`). El servidor solo responde si `remoteId` y `clientOrderId` coinciden.
+
+## Pago del envío con Wompi
+
+- Se paga en línea si `pagoEnLinea(envio)`: hay tarifa (> 0) y está `NEXT_PUBLIC_WOMPI_PUBLIC_KEY`. Si no, el envío se coordina con el cliente como antes.
+- Flujo: pedido creado "En espera" → `POST /api/pagos` (valida `orderId` + `clientOrderId`, lee el monto de `shipping_total` en Woo, **nunca del cliente**) → URL del Web Checkout con firma de integridad `sha256(referencia + centavos + "COP" + secreto)` → Wompi → regreso a `/pago?id=<transacción>`.
+- Referencia: `<pedido>-<sufijo>`. Wompi exige referencias únicas; cada intento lleva sufijo nuevo para poder reintentar tras un rechazo.
+- Confirmación: el **webhook** (`/api/pagos/webhook`) verifica el checksum (`signature.properties` + `timestamp` + secreto de eventos) y, con `APPROVED`, llama a `markShippingPaid()`. `/api/pagos/estado` hace lo mismo al volver el cliente, por si el webhook tarda. Nunca se confía en la URL de regreso.
+- `markShippingPaid()` es idempotente (meta `_pwa_pago_wompi` = id de la transacción): pasa el pedido de "En espera" a "Procesando" **sin `set_paid`** (el producto sigue contra entrega), pone `_pwa_envio` = "pagado" y deja una nota. Si el monto no coincide o el pedido ya no estaba "En espera", no cambia el estado: registra el pago y deja una nota "Revisar a mano".
+- Un rechazo deja el pedido "En espera"; el cliente reintenta con "Pagar envío" en Mis pedidos o en `/pago`.
+- Wompi reintenta el webhook hasta 3 veces en 24 h si no recibe 200. Un 500 (Woo caído) provoca el reintento.
+- Pruebas: con llaves `pub_test_`/`prv_test_` todo va al sandbox (`sandbox.wompi.co`). Configura la URL de eventos en el panel de Wompi, una por ambiente.
 
 ## API de pedidos: reglas del servidor
 
 - Nunca confiar en el precio del cliente. Se recalcula con la Store API. Si el precio cambió, el producto está agotado o falta stock, responde 409 `business`.
 - Celular colombiano: 10 dígitos que empiezan por 3.
-- El pedido se crea con `status: "on-hold"` (falta el pago del envío), `payment_method: "cod"` (el producto) y `set_paid: false`, con billing y shipping iguales (`state` = departamento, `country` = "CO"). Si hay tarifa para el destino, lleva una línea de envío (`shipping_lines`, `flat_rate`). El meta `_pwa_envio` dice "pendiente de pago" o "por cotizar". Al confirmar el pago del envío se pasa a mano a "Procesando".
+- El pedido se crea con `status: "on-hold"` (falta el pago del envío), `payment_method: "cod"` (el producto) y `set_paid: false`, con billing y shipping iguales (`state` = departamento, `country` = "CO"). Si hay tarifa para el destino, lleva una línea de envío (`shipping_lines`, `flat_rate`). El meta `_pwa_envio` dice "pendiente de pago", "por cotizar" o "pagado". Con Wompi pasa solo a "Procesando"; si el pago se coordinó con el cliente, se pasa a mano.
 - Envío **por destino**: `costoEnvio(departamento, ciudad)` en `src/lib/envio.ts`, con la tabla `src/config/envios.ts` (ciudad → departamento → por defecto). **Las tarifas aún no están definidas**: con la tabla vacía, todo destino sale "Por confirmar" (`null`) y el valor se coordina con el cliente. El carrito muestra "Según tu destino" y el checkout lo recalcula al elegir departamento y ciudad. El cliente envía el valor que vio (`shipping`) y el servidor lo recalcula con la misma tabla: si no coincide, responde 409 `business`. En la respuesta, `total` es lo que se recauda contra entrega (productos) y `shipping` va aparte.
 - Fase 0 (Dropi): verificar que el plugin cree el pedido al pasar de "En espera" a "Procesando" y que el **valor a recaudar sea solo el de los productos**. Si el plugin suma el envío, el transportador lo cobraría dos veces.
 
@@ -110,11 +119,13 @@ Estados (`OrderStatus` en `types.ts`): `pendiente` → `enviando` → `enviado`.
 
 `NEXT_PUBLIC_SITE_URL` (opcional, el dominio propio cuando exista; alimenta `metadataBase`). `GOOGLE_SITE_VERIFICATION` (opcional, código de la etiqueta HTML de Search Console). `HERO_VARIANTE` (opcional: `clasico` por defecto, `pasos`, `destacado` o `categorias`; elige el bloque principal del inicio en `components/Hero.tsx`, se lee en el build. `destacado` y `categorias` leen el catálogo y, sin datos, muestran el clásico). `WC_URL` (sin barra final), `WC_KEY` y `WC_SECRET` (llave REST de Woo con lectura y escritura, de un usuario dedicado). Ver `.env.example`. **Sin ellas, la app corre en modo demo** con `DEMO_PRODUCTS`, y `/api/pedidos` responde `demo: true` sin crear nada.
 
+Wompi: `NEXT_PUBLIC_WOMPI_PUBLIC_KEY` (pública; se inlinea en el build, así que hay que volver a desplegar al cambiarla), `WOMPI_PRIVATE_KEY`, `WOMPI_INTEGRITY_SECRET` y `WOMPI_EVENTS_SECRET` (solo servidor). Sin las cuatro, el pago en línea queda apagado y el envío se coordina con el cliente. El prefijo de la llave pública (`pub_test_` / `pub_prod_`) elige sandbox o producción.
+
 ## Estado actual
 
-- ✅ Fases 2 y 3: PWA base y capa offline. Probado en Chromium a 390 px: catálogo offline, ficha offline, carrito, checkout offline, pedido en cola que se sincroniza al volver la red, sin errores de JavaScript.
-- ✅ Route handlers de catálogo y pedidos, con modo demo.
-- ✅ Fase 0 del plan SEO (SSR primero), en la rama `feat/ssr-primero`. El HTML del servidor trae productos, títulos por ficha y categoría. Prueba E2E offline OK: ficha visitada, ficha y categoría no visitadas (respaldo desde IndexedDB), pedido sin señal que sale al volver la red.
+- ✅ PWA base y route handlers de pedidos, con modo demo.
+- ✅ Fase 0 del plan SEO (SSR primero). El HTML del servidor trae productos, títulos por ficha y categoría.
+- ✅ Modo offline retirado e integración con Wompi (2026-10-22). Probado contra un Woo simulado: creación de pedido, URL firmada (la firma de integridad coincide con el ejemplo de la documentación de Wompi), webhook (firma mala → 401, rechazo sin cambios, aprobado → "Procesando", repetido sin duplicar nota, monto distinto → nota "Revisar a mano") y en Chromium a 390 px: carrito, checkout, Mis pedidos, botón "Pagar envío" → Wompi, sin errores de JavaScript. **No probado contra el sandbox real de Wompi** (faltan llaves): la verificación del checksum del webhook y `fetchTransaction` se validan ahí.
 - ⏳ **Fase 0 (bloqueante antes de lanzar):** confirmar que el plugin de Dropi crea el pedido en Dropi cuando el pedido de Woo **llega por la REST API**. No está verificado; muchos plugins solo escuchan el checkout normal. El plan B está en el README.
 - ⏳ Montar WordPress + WooCommerce + plugin Dropify, importar productos y configurar las variables en Vercel.
 
@@ -127,7 +138,8 @@ Estados (`OrderStatus` en `types.ts`): `pendiente` → `enviando` → `enviado`.
   - **Fase 4:** Core Web Vitals (CrUX) y analítica.
 - **Legal, antes de lanzar:** llenar `src/config/legal.ts` (los campos vacíos se ven como "[Por definir]" en `/terminos`), decidir qué pasa con el envío pagado si el cliente rechaza el pedido en la puerta, hacer que un abogado revise `/terminos` y revisar también `/privacidad` (Ley 1581). La autorización de datos hoy se da al confirmar el pedido (texto con enlace bajo el botón); el abogado debe decir si basta o si hace falta una casilla para marcar.
 - Anti-spam en el checkout (Cloudflare Turnstile) y límite de pedidos por IP en `/api/pedidos`.
-- **Pasarela de pagos para el envío.** Puntos de enganche: el paso 3 del checkout, el meta `_pwa_envio` en Woo y la nota "falta el pago del envío" en Mis pedidos. Ojo con el offline: el pedido se puede armar sin señal, pero el pago necesita red, así que el flujo debe ser guardar → sincronizar → pagar.
+- **Wompi en sandbox:** crear la cuenta, poner las 4 variables con llaves de prueba, configurar la URL de eventos y hacer un pago aprobado, uno rechazado y uno PSE pendiente. Luego, llaves de producción.
+- Quitar `public/sw.js` (el service worker "de baja") cuando ya no queden visitantes con el service worker viejo.
 - Definir las tarifas de envío por destino (llenar `src/config/envios.ts`, o reemplazar `costoEnvio()` si salen de Dropi o de una transportadora). Para tarifas por ciudad conviene un selector de municipios, porque hoy la ciudad se escribe a mano.
 - Marca: el nombre "Tráelo" (`src/lib/brand.ts`) es provisional. Los íconos (`public/icon-*.png`, `src/app/apple-icon.png`, `src/app/favicon.ico`) se generaron del logo del encabezado: degradado `brand` → `brand-2`, radio de 1/3 del lado y "t" blanca a la mitad del alto. El maskable y el de iPhone van a sangre, sin esquinas, porque el sistema recorta su propia forma. Colores en `oklch` en `globals.css`; los botones principales van en `ink` porque el texto blanco sobre `brand` no da contraste AA.
 - Diseño: la foto viaja del catálogo a la ficha con `<ViewTransition name="producto-{id}" share="morph">`, que solo forma pareja si la ficha llega en el mismo commit que la navegación (fichas prerenderizadas y prefetcheadas). Las tarjetas aparecen con scroll-driven animations (`.reveal`), sin respaldo porque es decorativo. En `.text-gradient` usa `background-image`, no el atajo `background`.
@@ -138,10 +150,8 @@ Estados (`OrderStatus` en `types.ts`): `pendiente` → `enviando` → `enviado`.
 
 ```bash
 npm install
-npm run dev     # desarrollo, sin service worker
-npm run build   # next build && serwist build serwist.config.mjs → genera public/sw.js
-npm start       # producción local, con modo offline
+npm run dev     # desarrollo
+npm run build   # next build
+npm start       # producción local
 npm run lint
 ```
-
-`public/sw.js` es un archivo generado: está en `.gitignore` y en los ignores de ESLint. No lo edites; edita `src/app/sw.ts`.

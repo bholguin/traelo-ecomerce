@@ -1,6 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
-// <img> normal a propósito: next/image optimiza en el servidor y esa URL
-// no estaría disponible sin conexión. El service worker cachea las fotos.
+// <img> normal: las fotos vienen del dominio de WordPress/Dropi. Pasar a
+// next/image exige declarar ese dominio en images.remotePatterns.
 
 export function ProductImage({
   src,
