@@ -39,6 +39,7 @@ Celular (PWA Next.js) ──pedidos──▶ /api/pedidos (Vercel) ──REST v3
 - Next.js 16.4, React 19.3, TypeScript, Tailwind CSS v4 (tokens en `src/app/globals.css` con `@theme`)
 - Serwist 9.5 en modo configurador: `serwist.config.mjs` y `serwist build` después de `next build`
 - Dexie 4 + dexie-react-hooks (IndexedDB)
+- react-hook-form 7 en el checkout (validación por campo con las mismas reglas que `/api/pedidos`; sin librería de esquemas)
 - Sin Google Fonts: se usa la pila de fuentes del sistema, que funciona offline
 
 ## Estructura

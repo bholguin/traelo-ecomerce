@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { useForm, useWatch, type FieldError } from "react-hook-form";
 import { CashIcon, OfflineIcon, TruckIcon } from "@/components/Icons";
 import { envioLabel, notaPagoEnvio, PagoResumen } from "@/components/PagoResumen";
 import { ProductImage } from "@/components/ProductImage";
@@ -13,15 +14,64 @@ import { useCart, useOnline } from "@/lib/hooks";
 import { enqueueOrder } from "@/lib/sync";
 import type { Customer } from "@/lib/types";
 
-const field =
-  "h-12 w-full rounded-2xl border border-line bg-card px-4 outline-none transition focus:border-ink focus:ring-4 focus:ring-ink/5";
+type CheckoutForm = {
+  firstName: string;
+  lastName: string;
+  phone: string;
+  email: string;
+  department: string;
+  city: string;
+  address: string;
+  notes: string;
+};
 
-function Field({ label, children, wide }: { label: string; children: ReactNode; wide?: boolean }) {
+const DEFAULTS: CheckoutForm = {
+  firstName: "",
+  lastName: "",
+  phone: "",
+  email: "",
+  department: "",
+  city: "",
+  address: "",
+  notes: "",
+};
+
+// Mismas reglas que valida /api/pedidos (largos máximos, celular de 10 dígitos que
+// empieza por 3): así el servidor no rechaza lo que el formulario dejó pasar.
+const requerido = (campo: string, max = 120) => ({
+  required: `Escribe ${campo}.`,
+  validate: (v: string) => v.trim() !== "" || `Escribe ${campo}.`,
+  maxLength: { value: max, message: `Máximo ${max} caracteres.` },
+});
+
+const field =
+  "h-12 w-full rounded-2xl border border-line bg-card px-4 outline-none transition focus:border-ink focus:ring-4 focus:ring-ink/5 aria-invalid:border-bad aria-invalid:focus:ring-bad/10";
+
+function Field({
+  id,
+  label,
+  error,
+  children,
+  wide,
+}: {
+  id: keyof CheckoutForm;
+  label: string;
+  error?: FieldError;
+  children: ReactNode;
+  wide?: boolean;
+}) {
   return (
-    <label className={`block ${wide ? "sm:col-span-2" : ""}`}>
-      <span className="mb-1.5 block text-sm font-medium">{label}</span>
+    <div className={wide ? "sm:col-span-2" : ""}>
+      <label htmlFor={id} className="mb-1.5 block text-sm font-medium">
+        {label}
+      </label>
       {children}
-    </label>
+      {error?.message && (
+        <p id={`${id}-error`} className="mt-1.5 text-sm text-bad">
+          {error.message}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -41,11 +91,20 @@ export default function CheckoutPage() {
   const cart = useCart();
   const online = useOnline();
   const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
+  // Se queda en true al guardar: el carrito se vacía y, sin esto, el efecto de
+  // abajo mandaría al carrito vacío antes de llegar a Mis pedidos.
   const [sending, setSending] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    control,
+    setError,
+    formState: { errors },
+  } = useForm<CheckoutForm>({ mode: "onTouched", defaultValues: DEFAULTS });
+
   // El envío depende del destino: se recalcula al elegir departamento y ciudad.
-  const [department, setDepartment] = useState("");
-  const [city, setCity] = useState("");
+  const [department, city] = useWatch({ control, name: ["department", "city"] });
   const envio = department ? costoEnvio(department, city) : undefined;
 
   const empty = cart !== undefined && cart.length === 0 && !sending;
@@ -56,32 +115,30 @@ export default function CheckoutPage() {
   if (cart === undefined || cart.length === 0) return <p className="py-16 text-center text-muted">Cargando…</p>;
   const total = cart.reduce((s, i) => s + i.price * i.quantity, 0);
 
-  async function onSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setError(null);
-    const f = new FormData(e.currentTarget);
-    const get = (k: string) => String(f.get(k) ?? "").trim();
-    const phone = get("phone").replace(/\D/g, "");
-    if (!/^3\d{9}$/.test(phone)) {
-      setError("Escribe un celular de 10 dígitos que empiece por 3.");
-      return;
-    }
+  // Atributos de accesibilidad de cada campo según su error.
+  const a11y = (name: keyof CheckoutForm) => ({
+    id: name,
+    "aria-invalid": errors[name] ? true : undefined,
+    "aria-describedby": errors[name] ? `${name}-error` : undefined,
+  });
+
+  async function onSubmit(v: CheckoutForm) {
     const customer: Customer = {
-      firstName: get("firstName"),
-      lastName: get("lastName"),
-      phone,
-      email: get("email") || undefined,
-      department: get("department"),
-      city: get("city"),
-      address: get("address"),
-      notes: get("notes") || undefined,
+      firstName: v.firstName.trim(),
+      lastName: v.lastName.trim(),
+      phone: v.phone.replace(/\D/g, ""),
+      email: v.email.trim() || undefined,
+      department: v.department,
+      city: v.city.trim(),
+      address: v.address.trim(),
+      notes: v.notes.trim() || undefined,
     };
     setSending(true);
     try {
       const order = await enqueueOrder(customer);
       router.push(`/pedidos?nuevo=${order.clientOrderId}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo guardar el pedido");
+      setError("root", { message: err instanceof Error ? err.message : "No se pudo guardar el pedido" });
       setSending(false);
     }
   }
@@ -92,36 +149,58 @@ export default function CheckoutPage() {
       <p className="mt-1 text-sm text-muted">Solo te pedimos lo necesario para entregarte.</p>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_22rem] lg:items-start">
-        <form id="checkout" onSubmit={onSubmit} className="space-y-4">
+        {/* noValidate: los mensajes los muestra react-hook-form, no las burbujas del navegador */}
+        <form id="checkout" onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
           <Step n={1} title="¿Quién recibe?">
-            <Field label="Nombre">
-              <input name="firstName" required autoComplete="given-name" className={field} />
-            </Field>
-            <Field label="Apellido">
-              <input name="lastName" required autoComplete="family-name" className={field} />
-            </Field>
-            <Field label="Celular" wide>
+            <Field id="firstName" label="Nombre" error={errors.firstName}>
               <input
-                name="phone"
-                required
+                {...register("firstName", requerido("tu nombre"))}
+                {...a11y("firstName")}
+                autoComplete="given-name"
+                className={field}
+              />
+            </Field>
+            <Field id="lastName" label="Apellido" error={errors.lastName}>
+              <input
+                {...register("lastName", requerido("tu apellido"))}
+                {...a11y("lastName")}
+                autoComplete="family-name"
+                className={field}
+              />
+            </Field>
+            <Field id="phone" label="Celular" error={errors.phone} wide>
+              <input
+                {...register("phone", {
+                  required: "Escribe tu celular.",
+                  validate: (v) =>
+                    /^3\d{9}$/.test(v.replace(/\D/g, "")) || "Escribe un celular de 10 dígitos que empiece por 3.",
+                })}
+                {...a11y("phone")}
+                type="tel"
                 inputMode="numeric"
                 placeholder="3001234567"
                 autoComplete="tel-national"
                 className={field}
               />
             </Field>
-            <Field label="Correo (opcional)" wide>
-              <input name="email" type="email" autoComplete="email" className={field} />
+            <Field id="email" label="Correo (opcional)" error={errors.email} wide>
+              <input
+                {...register("email", {
+                  pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: "Revisa el correo: parece incompleto." },
+                })}
+                {...a11y("email")}
+                type="email"
+                autoComplete="email"
+                className={field}
+              />
             </Field>
           </Step>
 
           <Step n={2} title="¿Dónde lo entregamos?">
-            <Field label="Departamento">
+            <Field id="department" label="Departamento" error={errors.department}>
               <select
-                name="department"
-                required
-                value={department}
-                onChange={(e) => setDepartment(e.target.value)}
+                {...register("department", { required: "Elige el departamento." })}
+                {...a11y("department")}
                 className={field}
               >
                 <option value="" disabled>
@@ -132,22 +211,26 @@ export default function CheckoutPage() {
                 ))}
               </select>
             </Field>
-            <Field label="Ciudad o municipio">
+            <Field id="city" label="Ciudad o municipio" error={errors.city}>
               <input
-                name="city"
-                required
+                {...register("city", requerido("la ciudad o municipio"))}
+                {...a11y("city")}
                 autoComplete="address-level2"
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
                 className={field}
               />
             </Field>
-            <Field label="Dirección completa y barrio" wide>
-              <input name="address" required autoComplete="street-address" className={field} />
+            <Field id="address" label="Dirección completa y barrio" error={errors.address} wide>
+              <input
+                {...register("address", requerido("la dirección", 250))}
+                {...a11y("address")}
+                autoComplete="street-address"
+                className={field}
+              />
             </Field>
-            <Field label="Indicaciones para la entrega (opcional)" wide>
+            <Field id="notes" label="Indicaciones para la entrega (opcional)" error={errors.notes} wide>
               <textarea
-                name="notes"
+                {...register("notes", { maxLength: { value: 500, message: "Máximo 500 caracteres." } })}
+                {...a11y("notes")}
                 rows={2}
                 placeholder="Torre, apartamento, punto de referencia…"
                 className={`${field} h-auto py-3`}
@@ -215,9 +298,9 @@ export default function CheckoutPage() {
             </p>
           )}
 
-          {error && (
+          {errors.root?.message && (
             <p role="alert" className="rounded-2xl bg-bad/10 p-3 text-sm font-medium text-bad">
-              {error}
+              {errors.root.message}
             </p>
           )}
 
